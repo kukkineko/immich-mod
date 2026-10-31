@@ -28,6 +28,8 @@
   import { t } from 'svelte-i18n';
   import SettingAccordion from '$lib/components/shared-components/settings/SettingAccordion.svelte';
   import AppSettings from './AppSettings.svelte';
+  import FolderAppSettings from './FolderAppSettings.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import ChangePasswordSettings from './ChangePasswordSettings.svelte';
   import DeviceList from './DeviceList.svelte';
   import OauthSettings from './OauthSettings.svelte';
@@ -45,6 +47,17 @@
   let oauthOpen =
     oauth.isCallback(location) || $page.url.searchParams.get(QueryParameter.OPEN_SETTING) === OpenQueryParam.OAUTH;
 </script>
+
+{#if authManager.user.isAdmin}
+  <SettingAccordion
+    icon={mdiLockSmart}
+    key="folder-app"
+    title="Folder app"
+    subtitle="Title and how strict login is on this instance"
+  >
+    <FolderAppSettings />
+  </SettingAccordion>
+{/if}
 
 <SettingAccordion
   icon={mdiCogOutline}

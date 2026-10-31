@@ -1,9 +1,11 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
+import { FolderAppSettingsDto } from 'src/dtos/folder-app-settings.dto';
 import { FolderPersonDto } from 'src/dtos/folder-person.dto';
+import { parseFolderAssetFilter } from 'src/utils/folder-people';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { ViewService } from 'src/services/view.service';
@@ -12,6 +14,28 @@ import { ViewService } from 'src/services/view.service';
 @Controller('view')
 export class ViewController {
   constructor(private service: ViewService) {}
+
+  @Get('app-settings')
+  @Authenticated({ public: true })
+  @Endpoint({
+    summary: 'Retrieve folder app settings',
+    description: 'Retrieve the instance title and PIN mode. Public so the login page can adapt.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getAppSettings(): Promise<FolderAppSettingsDto> {
+    return this.service.getAppSettings();
+  }
+
+  @Put('app-settings')
+  @Authenticated({ admin: true })
+  @Endpoint({
+    summary: 'Update folder app settings',
+    description: 'Change the instance title and how strict PIN login is.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  updateAppSettings(@Body() dto: FolderAppSettingsDto): Promise<FolderAppSettingsDto> {
+    return this.service.updateAppSettings(dto);
+  }
 
   @Get('folder-people')
   @Authenticated({ permission: Permission.FolderRead })
@@ -33,13 +57,13 @@ export class ViewController {
   })
   getAssetsByFolderPerson(
     @Auth() auth: AuthDto,
-    @Query('name') name: string,
-    @Query('page') page?: string,
-    @Query('size') size?: string,
+    @Query() query: Record<string, string | undefined>,
   ): Promise<AssetResponseDto[]> {
+    const { name, page, size } = query;
     return this.service.getAssetsByFolderPerson(
       auth,
-      name,
+      name ?? '',
+      parseFolderAssetFilter(query),
       Math.max(0, Number.parseInt(page ?? '0', 10) || 0),
       Math.min(500, Math.max(1, Number.parseInt(size ?? '200', 10) || 200)),
     );

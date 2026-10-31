@@ -1,12 +1,43 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely, SelectQueryBuilder, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { asUuid, withExif } from 'src/utils/database';
+import { FolderAssetFilter } from 'src/utils/folder-people';
 
 const escapeRegex = (value: string) => value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 const escapeLike = (value: string) => value.replaceAll(/[%_\\]/g, String.raw`\$&`);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const applyAssetFilter = <QB extends SelectQueryBuilder<any, any, any>>(qb: QB, filter: FolderAssetFilter): QB => {
+  let query: SelectQueryBuilder<any, any, any> = qb
+    .$if(!!filter.q, (eb) => eb.where('asset.originalFileName', 'ilike', `%${escapeLike(filter.q!)}%`))
+    .$if(!!filter.takenFrom, (eb) => eb.where('asset.localDateTime', '>=', filter.takenFrom!))
+    .$if(!!filter.takenTo, (eb) => eb.where('asset.localDateTime', '<', filter.takenTo!))
+    .$if(!!filter.updatedFrom, (eb) => eb.where('asset.fileModifiedAt', '>=', filter.updatedFrom!))
+    .$if(!!filter.updatedTo, (eb) => eb.where('asset.fileModifiedAt', '<', filter.updatedTo!))
+    .$if(filter.minSize !== undefined, (eb) => eb.where('asset_exif.fileSizeInByte', '>=', filter.minSize!))
+    .$if(filter.maxSize !== undefined, (eb) => eb.where('asset_exif.fileSizeInByte', '<=', filter.maxSize!))
+    .$if(filter.minDuration !== undefined, (eb) => eb.where('asset.duration', '>=', filter.minDuration!))
+    .$if(filter.maxDuration !== undefined, (eb) => eb.where('asset.duration', '<=', filter.maxDuration!));
+
+  if (filter.typeFirst !== 'any') {
+    const first = filter.typeFirst === 'video' ? 'VIDEO' : 'IMAGE';
+    query = query.orderBy(sql`case when asset."type" = ${first} then 0 else 1 end`);
+  }
+
+  const columns = {
+    taken: 'asset.localDateTime',
+    updated: 'asset.fileModifiedAt',
+    name: 'asset.originalFileName',
+    size: 'asset_exif.fileSizeInByte',
+    duration: 'asset.duration',
+  } as const;
+  return query
+    .orderBy(columns[filter.sort], (ob) => (filter.dir === 'asc' ? ob.asc().nullsLast() : ob.desc().nullsLast()))
+    .orderBy('asset.id', 'asc') as QB;
+};
 
 export class ViewRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -104,18 +135,99 @@ export class ViewRepository {
     return { counts: counts.rows, faces: faces.rows, fallbacks: fallbacks.rows };
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, DummyValue.STRING, DummyValue.NUMBER, DummyValue.NUMBER] })
-  getAssetsByFolderPerson(userId: string, root: string, name: string, limit: number, offset: number) {
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
+  getLooseAssets(userId: string, root: string) {
+    return this.db
+      .selectFrom('asset')
+      .select(['asset.id', 'asset.type', 'asset.localDateTime'])
+      .where('ownerId', '=', asUuid(userId))
+      .where('visibility', '=', AssetVisibility.Timeline)
+      .where('deletedAt', 'is', null)
+      .where('originalPath', 'like', `${escapeLike(root)}/%`)
+      .where('originalPath', 'not like', `${escapeLike(root)}/%/%`)
+      .execute();
+  }
+
+  async getLooseFaces(assetIds: string[]) {
+    if (assetIds.length === 0) {
+      return [];
+    }
+    return this.db
+      .selectFrom('asset_face')
+      .select([
+        'assetId',
+        'personGroupId',
+        'boundingBoxX1 as x1',
+        'boundingBoxY1 as y1',
+        'boundingBoxX2 as x2',
+        'boundingBoxY2 as y2',
+        'imageWidth as width',
+        'imageHeight as height',
+      ])
+      .where('assetId', 'in', assetIds)
+      .where('deletedAt', 'is', null)
+      .where('isVisible', '=', true)
+      .execute();
+  }
+
+  async getPersonGroupNames(userId: string, groupIds: string[]) {
+    if (groupIds.length === 0) {
+      return [];
+    }
+    return this.db
+      .selectFrom('person')
+      .select(['personGroupId', 'name'])
+      .where('ownerId', '=', asUuid(userId))
+      .where('personGroupId', 'in', groupIds)
+      .where('name', '!=', '')
+      .execute();
+  }
+
+  async getOcrText(assetIds: string[]) {
+    if (assetIds.length === 0) {
+      return [];
+    }
+    return this.db
+      .selectFrom('asset_ocr')
+      .select(['assetId', 'text'])
+      .where('assetId', 'in', assetIds)
+      .where('isVisible', '=', true)
+      .execute();
+  }
+
+  getAssetsByIds(userId: string, ids: string[], filter: FolderAssetFilter, limit: number, offset: number) {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
     return this.db
       .selectFrom('asset')
       .selectAll('asset')
       .$call(withExif)
-      .where('ownerId', '=', asUuid(userId))
-      .where('visibility', '=', AssetVisibility.Timeline)
-      .where('deletedAt', 'is', null)
-      .where('originalPath', 'like', `${escapeLike(root)}/${escapeLike(name)}/%`)
-      .orderBy('localDateTime', 'desc')
-      .orderBy('id', 'asc')
+      .where('asset.ownerId', '=', asUuid(userId))
+      .where('asset.id', 'in', ids)
+      .$call((qb) => applyAssetFilter(qb, filter))
+      .limit(limit)
+      .offset(offset)
+      .execute();
+  }
+
+  getAssetsByFolderPerson(
+    userId: string,
+    root: string,
+    name: string,
+    filter: FolderAssetFilter,
+    limit: number,
+    offset: number,
+  ) {
+    return this.db
+      .selectFrom('asset')
+      .selectAll('asset')
+      .$call(withExif)
+      .where('asset.ownerId', '=', asUuid(userId))
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.originalPath', 'like', `${escapeLike(root)}/${escapeLike(name)}/%`)
+      .$call((qb) => applyAssetFilter(qb, filter))
       .limit(limit)
       .offset(offset)
       .execute();

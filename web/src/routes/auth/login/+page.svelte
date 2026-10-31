@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import AuthPageLayout from '$lib/components/layouts/AuthPageLayout.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
+  import { pinGate } from '$lib/stores/pin-gate.svelte';
   import { getServerErrorMessage } from '$lib/utils/handle-error';
   import type { LoginResponseDto } from '@immich/sdk';
   import { Alert, Button, Field, PasswordInput, Stack } from '@immich/ui';
@@ -36,6 +37,7 @@
         return;
       }
       const user: LoginResponseDto = await response.json();
+      pinGate.unlocked = true;
       await goto(data.continueUrl, { invalidateAll: true });
       eventManager.emit('AuthLogin', user);
     } catch {

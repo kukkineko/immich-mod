@@ -2,6 +2,8 @@ import { getStorage } from '@immich/sdk';
 import { redirect } from '@sveltejs/kit';
 import { DateTime } from 'luxon';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { appSettings } from '$lib/stores/app-settings.svelte';
+import { pinGate } from '$lib/stores/pin-gate.svelte';
 import { Route } from '$lib/route';
 import { userInteraction } from '$lib/stores/user.svelte';
 
@@ -13,12 +15,13 @@ export interface AuthOptions {
 export const authenticate = async (url: URL, options?: AuthOptions) => {
   const { public: publicRoute, admin: adminRoute } = options || {};
   await authManager.load();
+  await appSettings.load();
 
   if (publicRoute) {
     return;
   }
 
-  if (!authManager.authenticated) {
+  if (!authManager.authenticated || (appSettings.pinMode === 'every-load' && !pinGate.unlocked)) {
     redirect(307, Route.login({ continue: url.pathname + url.search }));
   }
 

@@ -29,7 +29,7 @@ import {
   mapLoginResponse,
 } from 'src/dtos/auth.dto';
 import { UserAdminResponseDto, mapUserAdmin } from 'src/dtos/user.dto';
-import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission } from 'src/enum';
+import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission, SystemMetadataKey } from 'src/enum';
 import { OAuthProfile } from 'src/repositories/oauth.repository';
 import { BaseService } from 'src/services/base.service';
 import { isGranted } from 'src/utils/access';
@@ -86,6 +86,11 @@ export class AuthService extends BaseService {
   private pinAttempts = new Map<string, { failures: number; resetAt: number }>();
 
   async loginWithPin(dto: PinLoginDto, details: LoginDetails) {
+    const settings = await this.systemMetadataRepository.get(SystemMetadataKey.FolderAppSettings);
+    if (settings?.pinMode === 'off') {
+      throw new ForbiddenException('PIN login is disabled on this instance');
+    }
+
     const now = Date.now();
     const key = details.clientIp;
     const attempts = this.pinAttempts.get(key);

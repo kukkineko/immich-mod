@@ -12,7 +12,9 @@ const FolderPersonFaceBoxSchema = z
 
 const FolderPersonSchema = z
   .object({
-    name: z.string().describe('Top-level folder name'),
+    key: z.string().describe('Identifier used to request the assets of this entry'),
+    kind: z.enum(['folder', 'face', 'text', 'other']).describe('Where this entry comes from'),
+    name: z.string().describe('Top-level folder name, or a generated label for loose media'),
     assetCount: z.number().int().describe('Number of assets in the folder, including all subfolders'),
     assetId: z.uuidv4().nullable().describe('Representative asset used for the portrait'),
     faceBox: FolderPersonFaceBoxSchema.nullable().describe('Face region to crop to, if the asset has a detected face'),

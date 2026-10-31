@@ -35,6 +35,12 @@ const asNotification = (
   };
 };
 
+/**
+ * This fork never asks the upstream project whether a newer release exists, and never tells clients about one,
+ * whatever the stored system config says.
+ */
+const UPSTREAM_VERSION_CHECK = false;
+
 @Injectable()
 export class VersionService extends BaseService {
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
@@ -86,7 +92,7 @@ export class VersionService extends BaseService {
 
   @OnEvent({ name: 'ConfigUpdate' })
   async onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
-    if (!oldConfig.newVersionCheck.enabled && newConfig.newVersionCheck.enabled) {
+    if (UPSTREAM_VERSION_CHECK && !oldConfig.newVersionCheck.enabled && newConfig.newVersionCheck.enabled) {
       await this.handleQueueVersionCheck();
     }
   }
@@ -101,7 +107,7 @@ export class VersionService extends BaseService {
       this.logger.debug('Running version check');
 
       const { newVersionCheck } = await this.getConfig({ withCache: true });
-      if (!newVersionCheck.enabled) {
+      if (!UPSTREAM_VERSION_CHECK || !newVersionCheck.enabled) {
         return JobStatus.Skipped;
       }
 
@@ -147,7 +153,7 @@ export class VersionService extends BaseService {
     );
 
     const { newVersionCheck } = await this.getConfig({ withCache: true });
-    if (!newVersionCheck.enabled) {
+    if (!UPSTREAM_VERSION_CHECK || !newVersionCheck.enabled) {
       return;
     }
 

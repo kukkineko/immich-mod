@@ -5927,6 +5927,45 @@
         "x-immich-state": "Stable"
       }
     },
+    "/auth/pin-login": {
+      "post": {
+        "description": "Login with the PIN code set in user settings and receive a session token.",
+        "operationId": "pinLogin",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinLoginDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Login with PIN",
+        "tags": [
+          "Authentication"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/auth/session/lock": {
       "post": {
         "description": "Remove elevated access to locked assets from the current session.",
@@ -17345,6 +17384,84 @@
         "x-immich-state": "Stable"
       }
     },
+    "/view/app-settings": {
+      "get": {
+        "description": "Retrieve the instance title and PIN mode. Public so the login page can adapt.",
+        "operationId": "getAppSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderAppSettingsDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Retrieve folder app settings",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ]
+      },
+      "put": {
+        "description": "Change the instance title and how strict PIN login is.",
+        "operationId": "updateAppSettings",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderAppSettingsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderAppSettingsDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Update folder app settings",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/view/folder": {
       "get": {
         "description": "Retrieve assets that are children of a specific folder.",
@@ -17405,6 +17522,94 @@
         ],
         "x-immich-permission": "folder.read",
         "x-immich-state": "Stable"
+      }
+    },
+    "/view/folder-people": {
+      "get": {
+        "description": "Retrieve each top-level folder as a person with a representative portrait asset.",
+        "operationId": "getFolderPeople",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FolderPersonDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve folder people",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
+    "/view/folder-people/assets": {
+      "get": {
+        "description": "Retrieve all assets of a top-level folder, including every subfolder, newest first.",
+        "operationId": "getAssetsByFolderPerson",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssetResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve folder person assets",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
       }
     },
     "/view/folder/unique-paths": {
@@ -22314,6 +22519,114 @@
         ],
         "type": "object"
       },
+      "FolderAppSettingsDto": {
+        "properties": {
+          "pinMode": {
+            "description": "every-load: ask for the PIN on every page load. session: PIN once per login. off: normal email and password login.",
+            "enum": [
+              "every-load",
+              "session",
+              "off"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "description": "Title shown in the header and browser tab",
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "pinMode",
+          "title"
+        ],
+        "type": "object"
+      },
+      "FolderPersonDto": {
+        "properties": {
+          "assetCount": {
+            "description": "Number of assets in the folder, including all subfolders",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "assetId": {
+            "description": "Representative asset used for the portrait",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "faceBox": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FolderPersonFaceBoxDto"
+              }
+            ],
+            "description": "Face region to crop to, if the asset has a detected face",
+            "nullable": true
+          },
+          "key": {
+            "description": "Identifier used to request the assets of this entry",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Where this entry comes from",
+            "enum": [
+              "folder",
+              "face",
+              "text",
+              "other"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "description": "Top-level folder name, or a generated label for loose media",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetCount",
+          "assetId",
+          "faceBox",
+          "key",
+          "kind",
+          "name"
+        ],
+        "type": "object"
+      },
+      "FolderPersonFaceBoxDto": {
+        "properties": {
+          "x1": {
+            "description": "Left edge as fraction of image width",
+            "format": "double",
+            "type": "number"
+          },
+          "x2": {
+            "description": "Right edge as fraction of image width",
+            "format": "double",
+            "type": "number"
+          },
+          "y1": {
+            "description": "Top edge as fraction of image height",
+            "format": "double",
+            "type": "number"
+          },
+          "y2": {
+            "description": "Bottom edge as fraction of image height",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x1",
+          "x2",
+          "y1",
+          "y2"
+        ],
+        "type": "object"
+      },
       "FoldersResponse": {
         "properties": {
           "enabled": {
@@ -25159,6 +25472,20 @@
         "type": "object"
       },
       "PinCodeSetupDto": {
+        "properties": {
+          "pinCode": {
+            "description": "PIN code (4-6 digits)",
+            "example": "123456",
+            "pattern": "^\\d{6}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pinCode"
+        ],
+        "type": "object"
+      },
+      "PinLoginDto": {
         "properties": {
           "pinCode": {
             "description": "PIN code (4-6 digits)",

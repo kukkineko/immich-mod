@@ -363,6 +363,7 @@ export enum SystemMetadataKey {
   VersionCheckState = 'version-check-state',
   License = 'license',
   IntegrityChecksumCheckpoint = 'integrity-checksum-checkpoint',
+  FolderAppSettings = 'folder-app-settings',
 }
 
 export enum UserMetadataKey {

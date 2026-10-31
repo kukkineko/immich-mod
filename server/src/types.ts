@@ -548,6 +548,7 @@ export interface SystemMetadata extends Record<SystemMetadataKey, Record<string,
   [SystemMetadataKey.VersionCheckState]: VersionCheckMetadata;
   [SystemMetadataKey.MemoriesState]: MemoriesState;
   [SystemMetadataKey.IntegrityChecksumCheckpoint]: { date?: string };
+  [SystemMetadataKey.FolderAppSettings]: { title?: string; pinMode?: 'every-load' | 'session' | 'off' };
 }
 
 export type UserPreferences = {

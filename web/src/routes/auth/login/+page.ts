@@ -1,6 +1,8 @@
 import { getPublicConfig } from '@immich/sdk';
 import { redirect } from '@sveltejs/kit';
 import { authManager } from '$lib/managers/auth-manager.svelte';
+import { appSettings } from '$lib/stores/app-settings.svelte';
+import { pinGate } from '$lib/stores/pin-gate.svelte';
 import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
 import { Route } from '$lib/route';
 import { getFormatter } from '$lib/utils/i18n';
@@ -11,7 +13,13 @@ export const load = (async ({ parent, url }) => {
 
   const continueUrl = Route.continue(url.searchParams.get('continue'), Route.photos());
 
-  if (authManager.authenticated) {
+  await appSettings.load();
+
+  if (appSettings.pinMode === 'off') {
+    redirect(307, `/auth/password-login${url.search}`);
+  }
+
+  if (authManager.authenticated && (appSettings.pinMode !== 'every-load' || pinGate.unlocked)) {
     redirect(307, continueUrl);
   }
 

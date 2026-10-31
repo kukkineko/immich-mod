@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import AuthPageLayout from '$lib/components/layouts/AuthPageLayout.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
+  import { pinGate } from '$lib/stores/pin-gate.svelte';
   import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import { Route } from '$lib/route';
   import { oauth } from '$lib/utils';
@@ -29,6 +30,7 @@
   const publicConfig = $derived(data.publicConfig);
 
   const onSuccess = async (user: LoginResponseDto) => {
+    pinGate.unlocked = true;
     await goto(data.continueUrl, { invalidateAll: true });
     eventManager.emit('AuthLogin', user);
   };
