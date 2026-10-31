@@ -139,12 +139,12 @@
   <FolderHeader {title} {backHref} />
 
   <main class="mx-auto max-w-[2000px] space-y-6 p-4 sm:p-6">
-    <div class="flex flex-wrap items-start gap-3">
+    <div class="flex flex-wrap items-stretch gap-3">
       <div class="min-w-0 flex-1"><FilterBar bind:query /></div>
       {#if parts.length === 1}
         <button
           type="button"
-          class="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+          class="flex items-center rounded-2xl border border-neutral-200 bg-white/70 px-4 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/50 dark:hover:bg-neutral-700"
           aria-pressed={!flattenSubfolders}
           onclick={toggleSubfolders}
         >
