@@ -3,7 +3,7 @@ import { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto } from 'src/dtos/folder-app-settings.dto';
 import { SystemMetadataKey } from 'src/enum';
-import { FolderPersonDto } from 'src/dtos/folder-person.dto';
+import { FolderPersonDto, LooseGroupDto } from 'src/dtos/folder-person.dto';
 import { FolderAssetFilter, groupLooseAssets } from 'src/utils/folder-people';
 import { BaseService } from 'src/services/base.service';
 
@@ -48,18 +48,31 @@ export class ViewService extends BaseService {
       };
     });
 
-    const loose = await this.getLooseGroups(auth);
-    return [
-      ...folders,
-      ...loose.map((group) => ({
-        key: group.key,
-        kind: group.kind,
-        name: group.name,
-        assetCount: group.assetIds.length,
-        assetId: group.portraitAssetId,
-        faceBox: group.faceBox,
-      })),
-    ];
+    return folders;
+  }
+
+  async getLooseMedia(auth: AuthDto): Promise<LooseGroupDto[]> {
+    const groups = await this.getLooseGroups(auth);
+    if (groups.length === 0) {
+      return [];
+    }
+    const rows = await this.viewRepository.getAssetsByIds(
+      auth.user.id,
+      groups.flatMap((group) => group.assetIds),
+      { sort: 'taken', dir: 'desc', typeFirst: 'any' },
+      2000,
+      0,
+    );
+    const byId = new Map(rows.map((row) => [row.id, mapAsset(row, { auth })]));
+    return groups.map((group) => ({
+      key: group.key,
+      kind: group.kind,
+      name: group.name,
+      assets: group.assetIds
+        .map((id) => byId.get(id))
+        .filter((asset): asset is AssetResponseDto => !!asset)
+        .toSorted((a, b) => b.localDateTime.localeCompare(a.localDateTime)),
+    }));
   }
 
   private async getLooseGroups(auth: AuthDto) {
@@ -71,14 +84,11 @@ export class ViewService extends BaseService {
     const faces = await this.viewRepository.getLooseFaces(ids);
     const groupIds = [...new Set(faces.map((face) => face.personGroupId).filter((id): id is string => !!id))];
     const names = await this.viewRepository.getPersonGroupNames(auth.user.id, groupIds);
-    const faceAssetIds = new Set(faces.filter((face) => face.personGroupId).map((face) => face.assetId));
-    const ocr = await this.viewRepository.getOcrText(ids.filter((id) => !faceAssetIds.has(id)));
 
     return groupLooseAssets(
       assets,
       faces,
       new Map(names.map((row) => [row.personGroupId, row.name])),
-      ocr,
     );
   }
 
@@ -89,14 +99,6 @@ export class ViewService extends BaseService {
     page: number,
     size: number,
   ): Promise<AssetResponseDto[]> {
-    if (name?.startsWith('loose:')) {
-      const group = (await this.getLooseGroups(auth)).find((entry) => entry.key === name);
-      if (!group) {
-        return [];
-      }
-      const rows = await this.viewRepository.getAssetsByIds(auth.user.id, group.assetIds, filter, size, page * size);
-      return rows.map((asset) => mapAsset(asset, { auth }));
-    }
     if (!name || name.includes('/')) {
       return [];
     }

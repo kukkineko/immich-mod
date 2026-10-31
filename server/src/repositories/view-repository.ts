@@ -183,18 +183,6 @@ export class ViewRepository {
       .execute();
   }
 
-  async getOcrText(assetIds: string[]) {
-    if (assetIds.length === 0) {
-      return [];
-    }
-    return this.db
-      .selectFrom('asset_ocr')
-      .select(['assetId', 'text'])
-      .where('assetId', 'in', assetIds)
-      .where('isVisible', '=', true)
-      .execute();
-  }
-
   getAssetsByIds(userId: string, ids: string[], filter: FolderAssetFilter, limit: number, offset: number) {
     if (ids.length === 0) {
       return Promise.resolve([]);

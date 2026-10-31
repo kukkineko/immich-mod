@@ -17612,6 +17612,50 @@
         "x-immich-permission": "folder.read"
       }
     },
+    "/view/folder-people/loose": {
+      "get": {
+        "description": "Retrieve media that sits directly in the library root, grouped by recognised face with the rest as Unsorted.",
+        "operationId": "getLooseMedia",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LooseGroupDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve loose media",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
     "/view/folder/unique-paths": {
       "get": {
         "description": "Retrieve a list of unique folder paths from asset original paths.",
@@ -22574,10 +22618,7 @@
           "kind": {
             "description": "Where this entry comes from",
             "enum": [
-              "folder",
-              "face",
-              "text",
-              "other"
+              "folder"
             ],
             "type": "string"
           },
@@ -23122,6 +23163,40 @@
         "required": [
           "redirectUri",
           "successful"
+        ],
+        "type": "object"
+      },
+      "LooseGroupDto": {
+        "properties": {
+          "assets": {
+            "description": "Media of the group, newest first",
+            "items": {
+              "$ref": "#/components/schemas/AssetResponseDto"
+            },
+            "type": "array"
+          },
+          "key": {
+            "description": "Identifier of the group",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Faces that belong together, or everything without a recognised face",
+            "enum": [
+              "face",
+              "other"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "description": "Person name, a generated label, or Unsorted",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assets",
+          "key",
+          "kind",
+          "name"
         ],
         "type": "object"
       },

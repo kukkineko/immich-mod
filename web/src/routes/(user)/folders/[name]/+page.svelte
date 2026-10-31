@@ -1,12 +1,11 @@
 <script lang="ts">
   import { appSettings } from '$lib/stores/app-settings.svelte';
-  import AssetInfo from '../AssetInfo.svelte';
   import FolderHeader from '../FolderHeader.svelte';
-  import VideoPlayer from '../VideoPlayer.svelte';
+  import MediaTile from '../MediaTile.svelte';
+  import MediaViewer from '../MediaViewer.svelte';
   import {
     assetsUrl,
     defaultQuery,
-    formatDuration,
     PAGE_SIZE,
     type AssetQuery,
     type FolderAsset,
@@ -20,8 +19,7 @@
 
   let { data }: Props = $props();
 
-  // folders use their own name; generated groups ("loose:face:…") get a readable title from the list
-  const title = $derived(data.key.startsWith('loose:') ? 'Unsorted media' : data.key);
+  const title = $derived(data.key);
 
   let query = $state<AssetQuery>(defaultQuery());
   let assets = $state<FolderAsset[]>([]);
@@ -31,10 +29,8 @@
   let failed = $state(false);
   let filtersOpen = $state(false);
   let openIndex = $state<number | undefined>();
-  let showInfo = $state(false);
   let initialised = false;
 
-  const current = $derived(openIndex === undefined ? undefined : assets[openIndex]);
   const filtersActive = $derived(
     Object.entries(query).some(([key, value]) => !['sort', 'dir', 'typeFirst'].includes(key) && value !== ''),
   );
@@ -109,36 +105,9 @@
 
   const reset = () => (query = defaultQuery());
 
-  const step = (delta: number) => {
-    if (openIndex === undefined) {
-      return;
-    }
-    const next = openIndex + delta;
-    if (next >= 0 && next < assets.length) {
-      openIndex = next;
-    }
-  };
-
-  const onkeydown = (event: KeyboardEvent) => {
-    if (openIndex === undefined || (event.target instanceof HTMLElement && event.target.matches('input, select'))) {
-      return;
-    }
-    if (event.key === 'Escape') {
-      openIndex = undefined;
-    } else if (event.key === 'ArrowLeft') {
-      step(-1);
-    } else if (event.key === 'ArrowRight') {
-      step(1);
-    } else if (event.key === 'i') {
-      showInfo = !showInfo;
-    }
-  };
-
   const inputClass =
     'w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800';
 </script>
-
-<svelte:window {onkeydown} />
 
 <svelte:head>
   <title>{title} – {appSettings.title}</title>
@@ -232,24 +201,9 @@
         {filtersActive || query.q ? 'Nothing matches these filters.' : 'Nothing in this folder.'}
       </p>
     {:else}
-      <ul class="grid grid-cols-3 gap-1 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+      <ul class="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {#each assets as asset, index (asset.id)}
-          <li class="relative aspect-square overflow-hidden bg-neutral-200 dark:bg-neutral-800">
-            <button type="button" class="block h-full w-full" onclick={() => (openIndex = index)}>
-              <img
-                src="/api/assets/{asset.id}/thumbnail?size=thumbnail"
-                alt={asset.originalFileName}
-                loading="lazy"
-                draggable="false"
-                class="h-full w-full object-cover"
-              />
-              {#if asset.type === 'VIDEO'}
-                <span class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 text-xs text-white">
-                  &#9654; {formatDuration(asset.duration)}
-                </span>
-              {/if}
-            </button>
-          </li>
+          <MediaTile {asset} onopen={() => (openIndex = index)} />
         {/each}
       </ul>
 
@@ -270,70 +224,6 @@
   </main>
 </div>
 
-{#if current}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/95">
-    {#key current.id}
-      {#if current.type === 'VIDEO'}
-        <VideoPlayer assetId={current.id} name={current.originalFileName} />
-      {:else}
-        <img
-          src="/api/assets/{current.id}/thumbnail?size=preview"
-          alt={current.originalFileName}
-          class="max-h-full max-w-full object-contain"
-        />
-      {/if}
-    {/key}
-
-    <div class="absolute top-4 left-4 flex gap-2">
-      <button
-        type="button"
-        class="rounded-full bg-white/20 px-4 py-2 text-white hover:bg-white/30"
-        onclick={() => (showInfo = !showInfo)}
-        aria-pressed={showInfo}
-      >
-        Info
-      </button>
-      <a
-        class="rounded-full bg-white/20 px-4 py-2 text-white hover:bg-white/30"
-        href="/api/assets/{current.id}/original"
-        download={current.originalFileName}
-      >
-        Download
-      </a>
-    </div>
-
-    <button
-      type="button"
-      class="absolute top-4 right-4 z-20 rounded-full bg-white/20 px-4 py-2 text-white hover:bg-white/30"
-      onclick={() => (openIndex = undefined)}
-    >
-      Close
-    </button>
-    {#if openIndex !== undefined && openIndex > 0}
-      <button
-        type="button"
-        class="absolute top-1/2 left-4 -translate-y-1/2 rounded-full bg-white/20 px-4 py-3 text-2xl text-white hover:bg-white/30"
-        aria-label="Previous"
-        onclick={() => step(-1)}
-      >
-        &lsaquo;
-      </button>
-    {/if}
-    {#if openIndex !== undefined && openIndex < assets.length - 1}
-      <button
-        type="button"
-        class="absolute top-1/2 {showInfo
-          ? 'right-84'
-          : 'right-4'} -translate-y-1/2 rounded-full bg-white/20 px-4 py-3 text-2xl text-white hover:bg-white/30"
-        aria-label="Next"
-        onclick={() => step(1)}
-      >
-        &rsaquo;
-      </button>
-    {/if}
-
-    {#if showInfo}
-      <AssetInfo asset={current} onclose={() => (showInfo = false)} />
-    {/if}
-  </div>
+{#if openIndex !== undefined}
+  <MediaViewer {assets} bind:index={openIndex} onclose={() => (openIndex = undefined)} />
 {/if}

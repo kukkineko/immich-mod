@@ -4,7 +4,7 @@ import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto } from 'src/dtos/folder-app-settings.dto';
-import { FolderPersonDto } from 'src/dtos/folder-person.dto';
+import { FolderPersonDto, LooseGroupDto } from 'src/dtos/folder-person.dto';
 import { parseFolderAssetFilter } from 'src/utils/folder-people';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
@@ -46,6 +46,18 @@ export class ViewController {
   })
   getFolderPeople(@Auth() auth: AuthDto): Promise<FolderPersonDto[]> {
     return this.service.getFolderPeople(auth);
+  }
+
+  @Get('folder-people/loose')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Retrieve loose media',
+    description:
+      'Retrieve media that sits directly in the library root, grouped by recognised face with the rest as Unsorted.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getLooseMedia(@Auth() auth: AuthDto): Promise<LooseGroupDto[]> {
+    return this.service.getLooseMedia(auth);
   }
 
   @Get('folder-people/assets')

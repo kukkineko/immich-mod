@@ -1,6 +1,6 @@
 export type FolderPerson = {
   key: string;
-  kind: 'folder' | 'face' | 'text' | 'other';
+  kind: 'folder';
   name: string;
   assetCount: number;
   assetId: string | null;
@@ -34,6 +34,13 @@ export type FolderAsset = {
     country?: string | null;
     description?: string | null;
   } | null;
+};
+
+export type LooseGroup = {
+  key: string;
+  kind: 'face' | 'other';
+  name: string;
+  assets: FolderAsset[];
 };
 
 export const PAGE_SIZE = 200;

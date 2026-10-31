@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { AssetResponseSchema } from 'src/dtos/asset-response.dto';
 import z from 'zod';
 
 const FolderPersonFaceBoxSchema = z
@@ -13,7 +14,7 @@ const FolderPersonFaceBoxSchema = z
 const FolderPersonSchema = z
   .object({
     key: z.string().describe('Identifier used to request the assets of this entry'),
-    kind: z.enum(['folder', 'face', 'text', 'other']).describe('Where this entry comes from'),
+    kind: z.literal('folder').describe('Where this entry comes from'),
     name: z.string().describe('Top-level folder name, or a generated label for loose media'),
     assetCount: z.number().int().describe('Number of assets in the folder, including all subfolders'),
     assetId: z.uuidv4().nullable().describe('Representative asset used for the portrait'),
@@ -22,3 +23,14 @@ const FolderPersonSchema = z
   .meta({ id: 'FolderPersonDto' });
 
 export class FolderPersonDto extends createZodDto(FolderPersonSchema) {}
+
+const LooseGroupSchema = z
+  .object({
+    key: z.string().describe('Identifier of the group'),
+    kind: z.enum(['face', 'other']).describe('Faces that belong together, or everything without a recognised face'),
+    name: z.string().describe('Person name, a generated label, or Unsorted'),
+    assets: z.array(AssetResponseSchema).describe('Media of the group, newest first'),
+  })
+  .meta({ id: 'LooseGroupDto' });
+
+export class LooseGroupDto extends createZodDto(LooseGroupSchema) {}

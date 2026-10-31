@@ -3,10 +3,9 @@
 
   interface Props {
     asset: FolderAsset;
-    onclose: () => void;
   }
 
-  let { asset, onclose }: Props = $props();
+  let { asset }: Props = $props();
 
   const exif = $derived(asset.exifInfo);
   const width = $derived(exif?.exifImageWidth ?? asset.width);
@@ -46,12 +45,7 @@
   class="absolute top-0 right-0 bottom-0 z-10 w-80 max-w-full overflow-y-auto bg-neutral-900/95 p-4 text-white shadow-2xl"
   aria-label="Info"
 >
-  <div class="mb-4 flex items-center justify-between">
-    <h2 class="text-lg font-semibold">Info</h2>
-    <button type="button" class="rounded-full bg-white/10 px-3 py-1 text-sm hover:bg-white/20" onclick={onclose}>
-      Hide
-    </button>
-  </div>
+  <h2 class="mt-12 mb-4 text-lg font-semibold">Info</h2>
   <dl class="space-y-3 text-sm">
     {#each rows as [label, value] (label)}
       <div>
