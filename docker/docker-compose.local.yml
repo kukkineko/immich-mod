@@ -1,0 +1,7 @@
+# Local dev override: run with
+#   docker compose -f docker-compose.dev.yml -f docker-compose.local.yml up
+# Mounts the (git-ignored) ./xx folder at the repo root as the library the folder-people UI reads.
+services:
+  immich-server:
+    volumes:
+      - ../xx:/media

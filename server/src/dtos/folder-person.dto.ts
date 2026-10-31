@@ -3,10 +3,10 @@ import z from 'zod';
 
 const FolderPersonFaceBoxSchema = z
   .object({
-    x1: z.number().describe('Left edge as fraction of image width'),
-    y1: z.number().describe('Top edge as fraction of image height'),
-    x2: z.number().describe('Right edge as fraction of image width'),
-    y2: z.number().describe('Bottom edge as fraction of image height'),
+    x1: z.number().meta({ format: 'double' }).describe('Left edge as fraction of image width'),
+    y1: z.number().meta({ format: 'double' }).describe('Top edge as fraction of image height'),
+    x2: z.number().meta({ format: 'double' }).describe('Right edge as fraction of image width'),
+    y2: z.number().meta({ format: 'double' }).describe('Bottom edge as fraction of image height'),
   })
   .meta({ id: 'FolderPersonFaceBoxDto' });
 
