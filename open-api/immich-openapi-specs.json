@@ -17612,6 +17612,50 @@
         "x-immich-permission": "folder.read"
       }
     },
+    "/view/folder-people/cover": {
+      "put": {
+        "description": "Choose which asset is shown as the image of a top-level folder, or reset it with a null asset.",
+        "operationId": "setFolderCover",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderCoverDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Set folder image",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
     "/view/folder-people/loose": {
       "get": {
         "description": "Retrieve media that sits directly in the library root, grouped by recognised face with the rest as Unsorted.",
@@ -17644,6 +17688,100 @@
           }
         ],
         "summary": "Retrieve loose media",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
+    "/view/folder-people/mode": {
+      "put": {
+        "description": "Choose per top-level folder whether its subfolders are folded into it or shown as folders.",
+        "operationId": "setFolderMode",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderModeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Set subfolder mode",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
+    "/view/folder-people/subfolders": {
+      "get": {
+        "description": "Retrieve the direct subfolders of a folder when subfolders are not folded into the main folder.",
+        "operationId": "getSubfolders",
+        "parameters": [
+          {
+            "name": "path",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderSubfoldersDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve subfolders",
         "tags": [
           "Views"
         ],
@@ -22565,6 +22703,10 @@
       },
       "FolderAppSettingsDto": {
         "properties": {
+          "flattenSubfolders": {
+            "description": "true: every subfolder is folded into its top-level folder. false: subfolders are shown as folders.",
+            "type": "boolean"
+          },
           "pinMode": {
             "description": "every-load: ask for the PIN on every page load. session: PIN once per login. off: normal email and password login.",
             "enum": [
@@ -22582,8 +22724,48 @@
           }
         },
         "required": [
+          "flattenSubfolders",
           "pinMode",
           "title"
+        ],
+        "type": "object"
+      },
+      "FolderCoverDto": {
+        "properties": {
+          "assetId": {
+            "description": "Asset to use as the folder image, null to go back to automatic",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Top-level folder name",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "name"
+        ],
+        "type": "object"
+      },
+      "FolderModeDto": {
+        "properties": {
+          "flattenSubfolders": {
+            "description": "true: fold all subfolders into the folder. false: show them as folders.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Top-level folder name",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "flattenSubfolders",
+          "name"
         ],
         "type": "object"
       },
@@ -22665,6 +22847,58 @@
           "x2",
           "y1",
           "y2"
+        ],
+        "type": "object"
+      },
+      "FolderSubfolderDto": {
+        "properties": {
+          "assetCount": {
+            "description": "Number of assets below this subfolder",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "assetId": {
+            "description": "Representative asset",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Subfolder name",
+            "type": "string"
+          },
+          "path": {
+            "description": "Path relative to the library root",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetCount",
+          "assetId",
+          "name",
+          "path"
+        ],
+        "type": "object"
+      },
+      "FolderSubfoldersDto": {
+        "properties": {
+          "flattenSubfolders": {
+            "description": "Whether subfolders of this top-level folder are folded into it",
+            "type": "boolean"
+          },
+          "folders": {
+            "description": "Direct subfolders to show, empty when folded",
+            "items": {
+              "$ref": "#/components/schemas/FolderSubfolderDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "flattenSubfolders",
+          "folders"
         ],
         "type": "object"
       },

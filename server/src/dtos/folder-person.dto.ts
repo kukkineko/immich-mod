@@ -24,6 +24,26 @@ const FolderPersonSchema = z
 
 export class FolderPersonDto extends createZodDto(FolderPersonSchema) {}
 
+const FolderSubfolderSchema = z
+  .object({
+    name: z.string().describe('Subfolder name'),
+    path: z.string().describe('Path relative to the library root'),
+    assetCount: z.number().int().describe('Number of assets below this subfolder'),
+    assetId: z.uuidv4().nullable().describe('Representative asset'),
+  })
+  .meta({ id: 'FolderSubfolderDto' });
+
+export class FolderSubfolderDto extends createZodDto(FolderSubfolderSchema) {}
+
+const FolderSubfoldersSchema = z
+  .object({
+    flattenSubfolders: z.boolean().describe('Whether subfolders of this top-level folder are folded into it'),
+    folders: z.array(FolderSubfolderSchema).describe('Direct subfolders to show, empty when folded'),
+  })
+  .meta({ id: 'FolderSubfoldersDto' });
+
+export class FolderSubfoldersDto extends createZodDto(FolderSubfoldersSchema) {}
+
 const LooseGroupSchema = z
   .object({
     key: z.string().describe('Identifier of the group'),

@@ -44,9 +44,10 @@
   });
 </script>
 
-<div class="relative flex max-h-full max-w-full items-center justify-center">
+<!-- full-size box so the video can be limited to the screen; only the media itself takes clicks, the rest closes the viewer -->
+<div class="pointer-events-none relative flex h-full w-full items-center justify-center">
   {#if failed}
-    <div class="flex flex-col items-center gap-3 rounded-2xl bg-neutral-900 p-8 text-center text-white">
+    <div class="pointer-events-auto flex flex-col items-center gap-3 rounded-2xl bg-neutral-900 p-8 text-center text-white">
       <p class="font-semibold">This video can't be played in the browser.</p>
       <p class="text-sm text-neutral-400">{name}</p>
       <div class="flex gap-2">
@@ -73,7 +74,7 @@
         autoplay
         playsinline
         preload="metadata"
-        class="max-h-full max-w-full"
+        class="pointer-events-auto max-h-full max-w-full"
         {onerror}
         onloadeddata={() => (buffering = false)}
         onwaiting={() => (buffering = true)}

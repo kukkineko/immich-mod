@@ -4,6 +4,7 @@
 
   let title = $state(appSettings.title);
   let pinMode = $state<PinMode>(appSettings.pinMode);
+  let flatten = $state(appSettings.flattenSubfolders);
   let saving = $state(false);
   let message = $state<{ ok: boolean; text: string } | undefined>();
 
@@ -32,7 +33,7 @@
       const response = await fetch('/api/view/app-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, pinMode }),
+        body: JSON.stringify({ title, pinMode, flattenSubfolders: flatten }),
       });
       if (!response.ok) {
         message = { ok: false, text: 'Could not save the settings.' };
@@ -72,6 +73,17 @@
         </label>
       {/each}
     </fieldset>
+
+    <label class="flex cursor-pointer items-start gap-3">
+      <input type="checkbox" bind:checked={flatten} class="mt-1" />
+      <span>
+        <span class="block font-medium">Fold subfolders into their main folder</span>
+        <span class="block text-sm text-gray-500">
+          Default for every folder. Turn it off to show a folder's subfolders as folders of their own (everything
+          below those is still folded into them). Each folder can override this with the button on its page.
+        </span>
+      </span>
+    </label>
 
     {#if pinMode !== 'off'}
       <p class="text-sm text-gray-500">The PIN itself is set in the PIN code section further down this page.</p>

@@ -22,6 +22,9 @@ const applyAssetFilter = <QB extends SelectQueryBuilder<any, any, any>>(qb: QB, 
     .$if(filter.minDuration !== undefined, (eb) => eb.where('asset.duration', '>=', filter.minDuration!))
     .$if(filter.maxDuration !== undefined, (eb) => eb.where('asset.duration', '<=', filter.maxDuration!));
 
+  // favourites are pinned to the top of every list
+  query = query.orderBy('asset.isFavorite', 'desc');
+
   if (filter.typeFirst !== 'any') {
     const first = filter.typeFirst === 'video' ? 'VIDEO' : 'IMAGE';
     query = query.orderBy(sql`case when asset."type" = ${first} then 0 else 1 end`);
@@ -199,10 +202,30 @@ export class ViewRepository {
       .execute();
   }
 
+  async getSubfolders(userId: string, root: string, path: string) {
+    const base = `${root}/${path}`;
+    const result = await sql<{ name: string; count: number; assetId: string }>`
+      select sub as name, count(*)::int as count,
+        (array_agg(id order by ("type" = 'IMAGE') desc, "localDateTime" desc))[1] as "assetId"
+      from (
+        select a.id, a."type", a."localDateTime", substring(a."originalPath" from ${`^${escapeRegex(base)}/([^/]+)/`}) as sub
+        from asset a
+        where a."ownerId" = ${userId}
+          and a.visibility = ${AssetVisibility.Timeline}
+          and a."deletedAt" is null
+          and a."originalPath" like ${escapeLike(base) + '/%'}
+      ) t
+      where sub is not null
+      group by sub order by sub
+    `.execute(this.db);
+    return result.rows;
+  }
+
   getAssetsByFolderPerson(
     userId: string,
     root: string,
     name: string,
+    flatten: boolean,
     filter: FolderAssetFilter,
     limit: number,
     offset: number,
@@ -215,6 +238,7 @@ export class ViewRepository {
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.deletedAt', 'is', null)
       .where('asset.originalPath', 'like', `${escapeLike(root)}/${escapeLike(name)}/%`)
+      .$if(!flatten, (eb) => eb.where('asset.originalPath', 'not like', `${escapeLike(root)}/${escapeLike(name)}/%/%`))
       .$call((qb) => applyAssetFilter(qb, filter))
       .limit(limit)
       .offset(offset)

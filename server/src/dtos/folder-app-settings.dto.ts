@@ -9,7 +9,28 @@ const FolderAppSettingsSchema = z
       .describe(
         'every-load: ask for the PIN on every page load. session: PIN once per login. off: normal email and password login.',
       ),
+    flattenSubfolders: z
+      .boolean()
+      .describe('true: every subfolder is folded into its top-level folder. false: subfolders are shown as folders.'),
   })
   .meta({ id: 'FolderAppSettingsDto' });
+
+const FolderCoverSchema = z
+  .object({
+    name: z.string().min(1).describe('Top-level folder name'),
+    assetId: z.uuidv4().nullable().describe('Asset to use as the folder image, null to go back to automatic'),
+  })
+  .meta({ id: 'FolderCoverDto' });
+
+export class FolderCoverDto extends createZodDto(FolderCoverSchema) {}
+
+const FolderModeSchema = z
+  .object({
+    name: z.string().min(1).describe('Top-level folder name'),
+    flattenSubfolders: z.boolean().describe('true: fold all subfolders into the folder. false: show them as folders.'),
+  })
+  .meta({ id: 'FolderModeDto' });
+
+export class FolderModeDto extends createZodDto(FolderModeSchema) {}
 
 export class FolderAppSettingsDto extends createZodDto(FolderAppSettingsSchema) {}

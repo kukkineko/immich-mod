@@ -7,11 +7,15 @@
     assets: FolderAsset[];
     index: number;
     onclose: () => void;
+    onfavorite: (asset: FolderAsset) => void;
+    /** only offered where the media belongs to a folder */
+    oncover?: (asset: FolderAsset) => Promise<boolean>;
   }
 
-  let { assets, index = $bindable(), onclose }: Props = $props();
+  let { assets, index = $bindable(), onclose, onfavorite, oncover }: Props = $props();
 
   let showInfo = $state(false);
+  let coverState = $state<'idle' | 'saving' | 'done' | 'failed'>('idle');
 
   const current = $derived(assets[index]);
 
@@ -34,6 +38,8 @@
       step(1);
     } else if (event.key === 'i') {
       showInfo = !showInfo;
+    } else if (event.key === 'f') {
+      onfavorite(current);
     }
   };
 
@@ -42,6 +48,12 @@
     if (event.target === event.currentTarget) {
       onclose();
     }
+  };
+
+  const makeCover = async () => {
+    coverState = 'saving';
+    coverState = (await oncover?.(current)) ? 'done' : 'failed';
+    setTimeout(() => (coverState = 'idle'), 2500);
   };
 
   const buttonClass = 'rounded-full bg-white/20 px-4 py-2 text-white hover:bg-white/30';
@@ -66,11 +78,28 @@
       {/key}
     </div>
 
-    <div class="absolute top-4 left-4 flex gap-2">
+    <div class="absolute top-4 left-4 flex flex-wrap gap-2">
+      <button
+        type="button"
+        class="{buttonClass} {current.isFavorite ? 'text-amber-300' : ''}"
+        aria-pressed={current.isFavorite}
+        onclick={() => onfavorite(current)}
+      >
+        {current.isFavorite ? '★ Favourite' : '☆ Favourite'}
+      </button>
       <button type="button" class={buttonClass} onclick={() => (showInfo = !showInfo)} aria-pressed={showInfo}>
         Info
       </button>
       <a class={buttonClass} href="/api/assets/{current.id}/original" download={current.originalFileName}>Download</a>
+      {#if oncover}
+        <button type="button" class={buttonClass} disabled={coverState === 'saving'} onclick={makeCover}>
+          {coverState === 'done'
+            ? 'Folder image set'
+            : coverState === 'failed'
+              ? 'Could not set image'
+              : 'Set as folder image'}
+        </button>
+      {/if}
     </div>
 
     <button type="button" class="absolute top-4 z-20 {buttonClass} {showInfo ? 'right-84' : 'right-4'}" onclick={onclose}>

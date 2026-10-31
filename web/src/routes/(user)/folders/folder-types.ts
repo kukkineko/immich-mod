@@ -15,6 +15,7 @@ export type FolderAsset = {
   localDateTime: string;
   fileCreatedAt: string;
   fileModifiedAt: string;
+  isFavorite: boolean;
   duration: number | null;
   width: number | null;
   height: number | null;
@@ -35,6 +36,15 @@ export type FolderAsset = {
     description?: string | null;
   } | null;
 };
+
+export type FolderSubfolder = {
+  name: string;
+  path: string;
+  assetCount: number;
+  assetId: string | null;
+};
+
+export type FolderSubfolders = { flattenSubfolders: boolean; folders: FolderSubfolder[] };
 
 export type LooseGroup = {
   key: string;
@@ -78,14 +88,55 @@ export const defaultQuery = (): AssetQuery => ({
 });
 
 export const assetsUrl = (key: string, query: AssetQuery, page: number) => {
-  const params = new URLSearchParams({ name: key, page: String(page), size: String(PAGE_SIZE) });
+  const params = queryParams(query);
+  params.set('name', key);
+  params.set('page', String(page));
+  params.set('size', String(PAGE_SIZE));
+  return `/api/view/folder-people/assets?${params}`;
+};
+
+const queryParams = (query: AssetQuery) => {
+  const params = new URLSearchParams();
   for (const [field, value] of Object.entries(query)) {
     if (value !== '') {
       params.set(field, value);
     }
   }
-  return `/api/view/folder-people/assets?${params}`;
+  return params;
 };
+
+export const looseUrl = (query: AssetQuery) => `/api/view/folder-people/loose?${queryParams(query)}`;
+
+/** width / height of the media, kept within a sane range so one odd file cannot wreck a row */
+export const aspectRatio = (asset: FolderAsset) => {
+  const width = asset.exifInfo?.exifImageWidth || asset.width;
+  const height = asset.exifInfo?.exifImageHeight || asset.height;
+  const ratio = width && height ? width / height : asset.type === 'VIDEO' ? 9 / 16 : 4 / 3;
+  return Math.min(2.2, Math.max(0.5, ratio));
+};
+
+/** stars or un-stars an asset; resolves to false (and leaves the asset untouched) when the server refuses */
+export const setFavorite = async (asset: FolderAsset, isFavorite: boolean) => {
+  try {
+    const response = await fetch(`/api/assets/${asset.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isFavorite }),
+    });
+    if (response.ok) {
+      asset.isFavorite = isFavorite;
+    }
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+/** favourites first, everything else keeps its order */
+export const favouritesFirst = <T extends { isFavorite: boolean }>(list: T[]) => [
+  ...list.filter((item) => item.isFavorite),
+  ...list.filter((item) => !item.isFavorite),
+];
 
 export const formatBytes = (bytes?: number | null) => {
   if (!bytes) {

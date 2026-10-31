@@ -3,6 +3,7 @@ export type PinMode = 'every-load' | 'session' | 'off';
 class AppSettingsStore {
   title = $state('People');
   pinMode = $state<PinMode>('every-load');
+  flattenSubfolders = $state(true);
   #loading?: Promise<void>;
 
   load() {
@@ -21,9 +22,10 @@ class AppSettingsStore {
     }
   }
 
-  apply(settings: { title: string; pinMode: PinMode }) {
+  apply(settings: { title: string; pinMode: PinMode; flattenSubfolders: boolean }) {
     this.title = settings.title;
     this.pinMode = settings.pinMode;
+    this.flattenSubfolders = settings.flattenSubfolders;
   }
 }
 

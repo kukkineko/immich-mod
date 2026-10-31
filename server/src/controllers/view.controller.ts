@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { FolderAppSettingsDto } from 'src/dtos/folder-app-settings.dto';
-import { FolderPersonDto, LooseGroupDto } from 'src/dtos/folder-person.dto';
+import { FolderAppSettingsDto, FolderCoverDto, FolderModeDto } from 'src/dtos/folder-app-settings.dto';
+import { FolderPersonDto, FolderSubfoldersDto, LooseGroupDto } from 'src/dtos/folder-person.dto';
 import { parseFolderAssetFilter } from 'src/utils/folder-people';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
@@ -56,8 +56,43 @@ export class ViewController {
       'Retrieve media that sits directly in the library root, grouped by recognised face with the rest as Unsorted.',
     history: new HistoryBuilder().added('v2'),
   })
-  getLooseMedia(@Auth() auth: AuthDto): Promise<LooseGroupDto[]> {
-    return this.service.getLooseMedia(auth);
+  getLooseMedia(@Auth() auth: AuthDto, @Query() query: Record<string, string | undefined>): Promise<LooseGroupDto[]> {
+    return this.service.getLooseMedia(auth, parseFolderAssetFilter(query));
+  }
+
+  @Put('folder-people/cover')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Set folder image',
+    description: 'Choose which asset is shown as the image of a top-level folder, or reset it with a null asset.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  setFolderCover(@Auth() auth: AuthDto, @Body() dto: FolderCoverDto): Promise<void> {
+    return this.service.setFolderCover(auth, dto);
+  }
+
+  @Put('folder-people/mode')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Set subfolder mode',
+    description: 'Choose per top-level folder whether its subfolders are folded into it or shown as folders.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  setFolderMode(@Auth() auth: AuthDto, @Body() dto: FolderModeDto): Promise<void> {
+    return this.service.setFolderMode(auth, dto);
+  }
+
+  @Get('folder-people/subfolders')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Retrieve subfolders',
+    description: 'Retrieve the direct subfolders of a folder when subfolders are not folded into the main folder.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getSubfolders(@Auth() auth: AuthDto, @Query('path') path: string): Promise<FolderSubfoldersDto> {
+    return this.service.getSubfolders(auth, path ?? '');
   }
 
   @Get('folder-people/assets')
