@@ -26,6 +26,12 @@ const LoginCredentialSchema = z
   })
   .meta({ id: 'LoginCredentialDto' });
 
+const PinLoginSchema = z
+  .object({
+    pinCode: z.string().regex(pinCodeRegex).describe('PIN code (4-6 digits)').meta({ example: '123456' }),
+  })
+  .meta({ id: 'PinLoginDto' });
+
 const LoginResponseSchema = z
   .object({
     accessToken: z.string().describe('Access token'),
@@ -139,6 +145,7 @@ const AuthStatusResponseSchema = z
   .meta({ id: 'AuthStatusResponseDto' });
 
 export class LoginCredentialDto extends createZodDto(LoginCredentialSchema) {}
+export class PinLoginDto extends createZodDto(PinLoginSchema) {}
 export class LoginResponseDto extends createZodDto(LoginResponseSchema) {}
 export class LogoutResponseDto extends createZodDto(LogoutResponseSchema) {}
 export class SignUpDto extends createZodDto(SignUpSchema) {}

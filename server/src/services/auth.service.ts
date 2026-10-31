@@ -1,4 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { parse } from 'cookie';
 import { DateTime } from 'luxon';
 import { IncomingHttpHeaders } from 'node:http';
@@ -16,6 +23,7 @@ import {
   PinCodeChangeDto,
   PinCodeResetDto,
   PinCodeSetupDto,
+  PinLoginDto,
   SessionUnlockDto,
   SignUpDto,
   mapLoginResponse,
@@ -72,6 +80,41 @@ export class AuthService extends BaseService {
       throw new UnauthorizedException('Incorrect email or password');
     }
 
+    return this.createLoginResponse(user, details);
+  }
+
+  private pinAttempts = new Map<string, { failures: number; resetAt: number }>();
+
+  async loginWithPin(dto: PinLoginDto, details: LoginDetails) {
+    const now = Date.now();
+    const key = details.clientIp;
+    const attempts = this.pinAttempts.get(key);
+    if (attempts && attempts.resetAt > now && attempts.failures >= 5) {
+      throw new HttpException('Too many failed PIN attempts, try again later', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const candidates = await this.userRepository.getAllWithPinCode();
+    let matchedUserId: string | undefined;
+    for (const candidate of candidates) {
+      // compare against every candidate so response time does not reveal which user matched
+      if (this.cryptoRepository.compareBcrypt(dto.pinCode, candidate.pinCode!) && !matchedUserId) {
+        matchedUserId = candidate.id;
+      }
+    }
+    if (candidates.length === 0) {
+      this.cryptoRepository.compareBcrypt(dto.pinCode, LOGIN_DUMMY_HASH);
+    }
+
+    const user = matchedUserId ? await this.userRepository.get(matchedUserId, {}) : undefined;
+    if (!user) {
+      const entry = attempts && attempts.resetAt > now ? attempts : { failures: 0, resetAt: now + 15 * 60 * 1000 };
+      entry.failures++;
+      this.pinAttempts.set(key, entry);
+      this.logger.warn(`Failed PIN login attempt from ip address ${details.clientIp}`);
+      throw new UnauthorizedException('Incorrect PIN');
+    }
+
+    this.pinAttempts.delete(key);
     return this.createLoginResponse(user, details);
   }
 

@@ -27,3 +27,6 @@ vite.config.js.timestamp-*
 .devcontainer/.env*
 *.tsbuildinfo
 *.tsbuildInfo
+
+# local-only folder
+/xx/

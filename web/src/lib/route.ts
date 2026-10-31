@@ -92,7 +92,7 @@ export const Route = {
     `/people/${id}` + asQueryString(params),
 
   // photos
-  photos: (params?: { at?: string }) => '/photos' + asQueryString(params),
+  photos: (params?: { at?: string }) => '/folders' + asQueryString(params),
   viewAsset: ({ id }: { id: string }) => `/photos/${id}`,
   archive: () => '/archive',
   favorites: () => '/favorites',

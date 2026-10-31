@@ -108,6 +108,16 @@ export class UserRepository {
       .executeTakeFirstOrThrow();
   }
 
+  @GenerateSql()
+  getAllWithPinCode() {
+    return this.db
+      .selectFrom('user')
+      .select(['user.id', 'user.pinCode'])
+      .where('user.pinCode', 'is not', null)
+      .where('user.deletedAt', 'is', null)
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   getForChangePassword(id: string) {
     return this.db

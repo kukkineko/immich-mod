@@ -12,6 +12,7 @@ import {
   PinCodeChangeDto,
   PinCodeResetDto,
   PinCodeSetupDto,
+  PinLoginDto,
   SessionUnlockDto,
   SignUpDto,
   ValidateAccessTokenResponseDto,
@@ -40,6 +41,30 @@ export class AuthController {
     @GetLoginDetails() loginDetails: LoginDetails,
   ): Promise<LoginResponseDto> {
     const body = await this.service.login(loginCredential, loginDetails);
+    return respondWithCookie(res, body, {
+      isSecure: loginDetails.isSecure,
+      values: [
+        { key: ImmichCookie.AccessToken, value: body.accessToken },
+        { key: ImmichCookie.AuthType, value: AuthType.Password },
+        { key: ImmichCookie.IsAuthenticated, value: 'true' },
+      ],
+    });
+  }
+
+  @Post('pin-login')
+  @Endpoint({
+    summary: 'Login with PIN',
+    description: 'Login with the PIN code set in user settings and receive a session token.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  @Authenticated({ public: true })
+  @HttpCode(HttpStatus.OK)
+  async pinLogin(
+    @Res({ passthrough: true }) res: Response,
+    @Body() dto: PinLoginDto,
+    @GetLoginDetails() loginDetails: LoginDetails,
+  ): Promise<LoginResponseDto> {
+    const body = await this.service.loginWithPin(dto, loginDetails);
     return respondWithCookie(res, body, {
       isSecure: loginDetails.isSecure,
       values: [
