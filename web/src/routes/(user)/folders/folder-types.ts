@@ -139,10 +139,13 @@ export const favouritesFirst = <T extends { isFavorite: boolean }>(list: T[]) =>
   ...list.filter((item) => !item.isFavorite),
 ];
 
-/** where to look for a picture of an asset: the big preview, then the small thumbnail, then (images only) the file itself */
-export const pictureSources = (id: string, isImage = true) => [
-  `/api/assets/${id}/thumbnail?size=preview`,
-  `/api/assets/${id}/thumbnail?size=thumbnail`,
+/**
+ * where to look for a picture of an asset, smallest file first to save bandwidth: tiles and portraits start with the
+ * small thumbnail, the viewer starts with the big preview; the other size and (images only) the file itself are fallbacks
+ */
+export const pictureSources = (id: string, isImage = true, first: 'thumbnail' | 'preview' = 'thumbnail') => [
+  `/api/assets/${id}/thumbnail?size=${first}`,
+  `/api/assets/${id}/thumbnail?size=${first === 'thumbnail' ? 'preview' : 'thumbnail'}`,
   ...(isImage ? [`/api/assets/${id}/original`] : []),
 ];
 

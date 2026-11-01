@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import AuthPageLayout from '$lib/components/layouts/AuthPageLayout.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
+  import { appSettings } from '$lib/stores/app-settings.svelte';
   import { pinGate } from '$lib/stores/pin-gate.svelte';
   import { getServerErrorMessage } from '$lib/utils/handle-error';
   import type { LoginResponseDto } from '@immich/sdk';
@@ -72,5 +73,8 @@
     </form>
 
     <a href="/auth/password-login" class="text-center text-sm text-gray-500 underline">Use email and password</a>
+    {#if appSettings.mode === 'travel'}
+      <Button href="/travel" shape="round" color="secondary" fullWidth>Back to public page</Button>
+    {/if}
   </Stack>
 </AuthPageLayout>

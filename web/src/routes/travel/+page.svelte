@@ -47,7 +47,7 @@
             <a href="/travel/{encodeURIComponent(trip.name)}" class="group relative block aspect-[4/5] overflow-hidden rounded-3xl bg-neutral-900">
               {#if trip.assetId}
                 <img
-                  src={publicFile(trip.assetId, 'preview')}
+                  src={publicFile(trip.assetId, 'thumbnail')}
                   alt={trip.name}
                   loading="lazy"
                   class="h-full w-full object-cover transition duration-700 group-hover:scale-105"

@@ -38,12 +38,41 @@
     }
   };
 
-  const ontouchstart = () => {
+  let startX = 0;
+  let startY = 0;
+
+  const ontouchstart = (event: TouchEvent) => {
     touchPreviewed = false;
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
+    clearTimeout(holdTimer);
     holdTimer = setTimeout(() => {
       touchPreviewed = true;
       start();
-    }, 300);
+    }, 250);
+  };
+
+  // a finger that travels is scrolling, not holding
+  const ontouchmove = (event: TouchEvent) => {
+    if (Math.hypot(event.touches[0].clientX - startX, event.touches[0].clientY - startY) > 12) {
+      stop();
+    }
+  };
+
+  // some browsers cancel the touch when a long press begins (their own press menu); keep playing then and stop
+  // as soon as the user touches or scrolls anything else
+  const ontouchcancel = () => {
+    if (!previewing) {
+      stop();
+      return;
+    }
+    const end = () => {
+      stop();
+      window.removeEventListener('touchstart', end, true);
+      window.removeEventListener('scroll', end, true);
+    };
+    window.addEventListener('touchstart', end, { capture: true, once: true });
+    window.addEventListener('scroll', end, { capture: true, once: true });
   };
 
   const onclick = (event: MouseEvent) => {
@@ -67,11 +96,12 @@
     type="button"
     class="absolute inset-0 block h-full w-full select-none [-webkit-touch-callout:none]"
     {onpointerenter}
-    onpointerleave={stop}
+    onpointerleave={(event) => event.pointerType !== 'touch' && stop()}
     {ontouchstart}
+    {ontouchmove}
     ontouchend={stop}
-    ontouchcancel={stop}
-    oncontextmenu={(event) => isVideo && event.preventDefault()}
+    {ontouchcancel}
+    oncontextmenu={(event) => event.preventDefault()}
     {onclick}
   >
     {#if imageFailed}
@@ -85,7 +115,7 @@
         alt={asset.originalFileName}
         loading="lazy"
         draggable="false"
-        class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+        class="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
         onerror={() => sourceIndex++}
       />
     {/if}
@@ -97,7 +127,7 @@
         autoplay
         playsinline
         preload="auto"
-        class="absolute inset-0 h-full w-full bg-black object-cover"
+        class="pointer-events-none absolute inset-0 h-full w-full bg-black object-cover"
         onerror={() => {
           previewFailed = true;
           previewing = false;

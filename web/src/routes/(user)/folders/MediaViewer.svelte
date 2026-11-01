@@ -19,7 +19,7 @@
 
   const current = $derived(assets[index]);
   let sourceIndex = $state(0);
-  const pictures = $derived(current ? pictureSources(current.id) : []);
+  const pictures = $derived(current ? pictureSources(current.id, true, 'preview') : []);
   // a new picture starts again from the best source
   $effect(() => {
     void current?.id;

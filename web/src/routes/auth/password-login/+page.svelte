@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import AuthPageLayout from '$lib/components/layouts/AuthPageLayout.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
+  import { appSettings } from '$lib/stores/app-settings.svelte';
   import { pinGate } from '$lib/stores/pin-gate.svelte';
   import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import { Route } from '$lib/route';
@@ -191,6 +192,10 @@
 
     {#if !publicConfig.passwordLogin.enabled && !publicConfig.oauth.enabled}
       <Alert color="warning" title={$t('login_has_been_disabled')} />
+    {/if}
+
+    {#if appSettings.mode === 'travel'}
+      <Button href="/travel" shape="round" color="secondary" fullWidth>Back to public page</Button>
     {/if}
   </Stack>
 </AuthPageLayout>

@@ -78,7 +78,7 @@
             <div style="padding-bottom: {100 / ratio}%"></div>
             <button type="button" class="absolute inset-0 block h-full w-full" onclick={() => (openIndex = index)}>
               <img
-                src={publicFile(photo.id, 'preview')}
+                src={publicFile(photo.id, 'thumbnail')}
                 alt={photo.name}
                 loading="lazy"
                 class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"

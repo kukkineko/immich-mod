@@ -58,7 +58,7 @@
     const x = face.boundingBoxX1 / face.imageWidth;
     const y = face.boundingBoxY1 / face.imageHeight;
     return [
-      `background-image: url(/api/assets/${asset.id}/thumbnail?size=preview)`,
+      `background-image: url(/api/assets/${asset.id}/thumbnail?size=thumbnail)`,
       `background-size: ${100 / fw}% ${100 / fh}%`,
       `background-position: ${fw >= 1 ? 0 : (x / (1 - fw)) * 100}% ${fh >= 1 ? 0 : (y / (1 - fh)) * 100}%`,
     ].join(';');
