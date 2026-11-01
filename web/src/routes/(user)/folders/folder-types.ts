@@ -138,6 +138,13 @@ export const favouritesFirst = <T extends { isFavorite: boolean }>(list: T[]) =>
   ...list.filter((item) => !item.isFavorite),
 ];
 
+/** where to look for a picture of an asset: the big preview, then the small thumbnail, then (images only) the file itself */
+export const pictureSources = (id: string, isImage = true) => [
+  `/api/assets/${id}/thumbnail?size=preview`,
+  `/api/assets/${id}/thumbnail?size=thumbnail`,
+  ...(isImage ? [`/api/assets/${id}/original`] : []),
+];
+
 export const formatBytes = (bytes?: number | null) => {
   if (!bytes) {
     return '–';

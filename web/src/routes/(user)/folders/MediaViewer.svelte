@@ -1,7 +1,7 @@
 <script lang="ts">
   import AssetInfo from './AssetInfo.svelte';
   import VideoPlayer from './VideoPlayer.svelte';
-  import type { FolderAsset } from './folder-types';
+  import { pictureSources, type FolderAsset } from './folder-types';
 
   interface Props {
     assets: FolderAsset[];
@@ -18,6 +18,13 @@
   let coverState = $state<'idle' | 'saving' | 'done' | 'failed'>('idle');
 
   const current = $derived(assets[index]);
+  let sourceIndex = $state(0);
+  const pictures = $derived(current ? pictureSources(current.id) : []);
+  // a new picture starts again from the best source
+  $effect(() => {
+    void current?.id;
+    sourceIndex = 0;
+  });
 
   const step = (delta: number) => {
     const next = index + delta;
@@ -70,7 +77,8 @@
           <VideoPlayer assetId={current.id} name={current.originalFileName} />
         {:else}
           <img
-            src="/api/assets/{current.id}/thumbnail?size=preview"
+            src={pictures[Math.min(sourceIndex, pictures.length - 1)]}
+            onerror={() => sourceIndex++}
             alt={current.originalFileName}
             class="max-h-full max-w-full object-contain"
           />

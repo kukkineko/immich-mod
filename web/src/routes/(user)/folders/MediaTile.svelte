@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { aspectRatio, formatDuration, type FolderAsset } from './folder-types';
+  import { aspectRatio, formatDuration, pictureSources, type FolderAsset } from './folder-types';
 
   interface Props {
     asset: FolderAsset;
@@ -11,7 +11,9 @@
 
   let previewing = $state(false);
   let previewFailed = $state(false);
-  let imageFailed = $state(false);
+  let sourceIndex = $state(0);
+  const sources = $derived(pictureSources(asset.id, asset.type === 'IMAGE'));
+  const imageFailed = $derived(sourceIndex >= sources.length);
   let holdTimer: ReturnType<typeof setTimeout> | undefined;
   let touchPreviewed = false;
 
@@ -79,12 +81,12 @@
     {:else}
       <!-- videos keep their whole frame (portrait clips would be cropped to a square otherwise) -->
       <img
-        src="/api/assets/{asset.id}/thumbnail?size=preview"
+        src={sources[sourceIndex]}
         alt={asset.originalFileName}
         loading="lazy"
         draggable="false"
         class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-        onerror={() => (imageFailed = true)}
+        onerror={() => sourceIndex++}
       />
     {/if}
     {#if previewing}

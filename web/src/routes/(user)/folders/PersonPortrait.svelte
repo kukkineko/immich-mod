@@ -15,6 +15,10 @@
   let { assetId, faceBox, alt }: Props = $props();
 
   // natural size of the loaded image, needed to turn the face fractions into a square crop
+  import { pictureSources } from './folder-types';
+
+  let sourceIndex = $state(0);
+  const sources = $derived(assetId ? pictureSources(assetId) : []);
   let size = $state<{ width: number; height: number } | undefined>();
 
   const crop = $derived.by(() => {
@@ -40,7 +44,8 @@
 <div class="relative aspect-square w-full overflow-hidden bg-neutral-200 dark:bg-neutral-800">
   {#if assetId}
     <img
-      src="/api/assets/{assetId}/thumbnail?size=preview"
+      src={sources[Math.min(sourceIndex, sources.length - 1)]}
+      onerror={() => sourceIndex++}
       {alt}
       loading="lazy"
       draggable="false"
