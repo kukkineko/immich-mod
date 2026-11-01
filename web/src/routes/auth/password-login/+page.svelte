@@ -35,8 +35,15 @@
     eventManager.emit('AuthLogin', user);
   };
 
-  const onFirstLogin = () => goto(Route.changePassword());
-  const onOnboarding = () => goto(Route.onboarding());
+  // a correct password already proves who it is, also on the way through the first-login pages
+  const onFirstLogin = () => {
+    pinGate.unlocked = true;
+    return goto(Route.changePassword());
+  };
+  const onOnboarding = () => {
+    pinGate.unlocked = true;
+    return goto(Route.onboarding());
+  };
 
   onMount(async () => {
     if (!publicConfig.oauth.enabled) {

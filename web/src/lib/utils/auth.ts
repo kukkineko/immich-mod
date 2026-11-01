@@ -21,7 +21,7 @@ export const authenticate = async (url: URL, options?: AuthOptions) => {
     return;
   }
 
-  if (!authManager.authenticated || (appSettings.pinMode === 'every-load' && !pinGate.unlocked)) {
+  if (!authManager.authenticated || (appSettings.pinMode === 'every-load' && appSettings.pinConfigured && !pinGate.unlocked)) {
     redirect(307, Route.login({ continue: url.pathname + url.search }));
   }
 

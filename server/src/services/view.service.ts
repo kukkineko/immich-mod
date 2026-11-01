@@ -28,6 +28,7 @@ export class ViewService extends BaseService {
       pinMode: stored?.pinMode ?? 'every-load',
       flattenSubfolders: stored?.flattenSubfolders ?? true,
       mode: stored?.mode ?? 'content',
+      pinConfigured: (await this.userRepository.getAllWithPinCode()).length > 0,
     };
   }
 

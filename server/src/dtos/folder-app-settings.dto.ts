@@ -17,6 +17,10 @@ const FolderAppSettingsSchema = z
       .describe(
         'content: private folder gallery for one user. travel: the same private side plus a public showcase of chosen trips.',
       ),
+    pinConfigured: z
+      .boolean()
+      .optional()
+      .describe('Read only: whether any user has set a PIN yet. Without one the PIN screen is skipped.'),
   })
   .meta({ id: 'FolderAppSettingsDto' });
 

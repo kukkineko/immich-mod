@@ -15,11 +15,11 @@ export const load = (async ({ parent, url }) => {
 
   await appSettings.load();
 
-  if (appSettings.pinMode === 'off') {
+  if (appSettings.pinMode === 'off' || !appSettings.pinConfigured) {
     redirect(307, `/auth/password-login${url.search}`);
   }
 
-  if (authManager.authenticated && (appSettings.pinMode !== 'every-load' || pinGate.unlocked)) {
+  if (authManager.authenticated && (appSettings.pinMode !== 'every-load' || !appSettings.pinConfigured || pinGate.unlocked)) {
     redirect(307, continueUrl);
   }
 

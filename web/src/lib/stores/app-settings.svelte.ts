@@ -6,6 +6,8 @@ class AppSettingsStore {
   pinMode = $state<PinMode>('every-load');
   flattenSubfolders = $state(true);
   mode = $state<AppMode>('content');
+  /** false until somebody sets a PIN; the PIN screen is skipped meanwhile */
+  pinConfigured = $state(true);
   #loading?: Promise<void>;
 
   load() {
@@ -24,11 +26,12 @@ class AppSettingsStore {
     }
   }
 
-  apply(settings: { title: string; pinMode: PinMode; flattenSubfolders: boolean; mode: AppMode }) {
+  apply(settings: { title: string; pinMode: PinMode; flattenSubfolders: boolean; mode: AppMode; pinConfigured?: boolean }) {
     this.title = settings.title;
     this.pinMode = settings.pinMode;
     this.flattenSubfolders = settings.flattenSubfolders;
     this.mode = settings.mode;
+    this.pinConfigured = settings.pinConfigured ?? this.pinConfigured;
   }
 }
 
