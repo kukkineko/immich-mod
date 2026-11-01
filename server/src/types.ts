@@ -552,9 +552,11 @@ export interface SystemMetadata extends Record<SystemMetadataKey, Record<string,
     title?: string;
     pinMode?: 'every-load' | 'session' | 'off';
     flattenSubfolders?: boolean;
+    mode?: 'content' | 'travel';
   };
   [SystemMetadataKey.FolderCovers]: Record<string, string>;
   [SystemMetadataKey.FolderModes]: Record<string, boolean>;
+  [SystemMetadataKey.FolderPublic]: Record<string, boolean>;
 }
 
 export type UserPreferences = {

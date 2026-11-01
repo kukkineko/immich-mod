@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
+import { appSettings } from '$lib/stores/app-settings.svelte';
 import { Route } from '$lib/route';
 import { getFormatter } from '$lib/utils/i18n';
 import { init } from '$lib/utils/server';
@@ -18,6 +19,10 @@ export const load = (async ({ fetch }) => {
     }
 
     await authManager.load();
+    await appSettings.load();
+    if (!authManager.authenticated && appSettings.mode === 'travel') {
+      redirect(307, '/travel');
+    }
     if (authManager.authenticated) {
       redirect(307, Route.photos());
     }

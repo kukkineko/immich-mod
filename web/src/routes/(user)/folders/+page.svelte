@@ -94,7 +94,9 @@
                   class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-12 text-white"
                 >
                   <p class="truncate text-lg font-semibold">{person.name}</p>
-                  <p class="text-xs text-white/70">{person.assetCount} items</p>
+                  <p class="text-xs text-white/70">
+                    {person.assetCount} items{appSettings.mode === 'travel' && person.isPublic ? ' · Public' : ''}
+                  </p>
                 </div>
               </a>
             </li>

@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { appSettings, type PinMode } from '$lib/stores/app-settings.svelte';
+  import { appSettings, type AppMode, type PinMode } from '$lib/stores/app-settings.svelte';
   import { Alert, Button, Field, Input, Stack } from '@immich/ui';
 
   let title = $state(appSettings.title);
   let pinMode = $state<PinMode>(appSettings.pinMode);
   let flatten = $state(appSettings.flattenSubfolders);
+  let mode = $state<AppMode>(appSettings.mode);
   let saving = $state(false);
   let message = $state<{ ok: boolean; text: string } | undefined>();
 
@@ -33,7 +34,7 @@
       const response = await fetch('/api/view/app-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, pinMode, flattenSubfolders: flatten }),
+        body: JSON.stringify({ title, pinMode, flattenSubfolders: flatten, mode }),
       });
       if (!response.ok) {
         message = { ok: false, text: 'Could not save the settings.' };
@@ -60,6 +61,27 @@
     <Field label="Title" description="Shown in the header and the browser tab.">
       <Input bind:value={title} maxlength={60} required />
     </Field>
+
+    <fieldset class="flex flex-col gap-3">
+      <legend class="mb-1 font-medium">Mode of this instance</legend>
+      <label class="flex cursor-pointer items-start gap-3">
+        <input type="radio" name="app-mode" value="content" bind:group={mode} class="mt-1" />
+        <span>
+          <span class="block font-medium">Content</span>
+          <span class="block text-sm text-gray-500">Private gallery of videos and pictures for a single user.</span>
+        </span>
+      </label>
+      <label class="flex cursor-pointer items-start gap-3">
+        <input type="radio" name="app-mode" value="travel" bind:group={mode} class="mt-1" />
+        <span>
+          <span class="block font-medium">Travel</span>
+          <span class="block text-sm text-gray-500">
+            High-resolution travel photos with a public showcase (/travel) and this private side. Choose which
+            folders are public with the Public button on a folder's page. Only administrators can change the mode.
+          </span>
+        </span>
+      </label>
+    </fieldset>
 
     <fieldset class="flex flex-col gap-3">
       <legend class="mb-1 font-medium">How strict is login?</legend>

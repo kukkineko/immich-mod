@@ -17,5 +17,6 @@
     subfolders={data.subfolders.folders}
     flattenSubfolders={data.subfolders.flattenSubfolders}
     initialFailed={data.failed}
+    initialPublic={data.isPublic}
   />
 {/key}

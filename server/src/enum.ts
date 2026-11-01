@@ -366,6 +366,7 @@ export enum SystemMetadataKey {
   FolderAppSettings = 'folder-app-settings',
   FolderCovers = 'folder-covers',
   FolderModes = 'folder-modes',
+  FolderPublic = 'folder-public',
 }
 
 export enum UserMetadataKey {

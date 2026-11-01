@@ -4,6 +4,7 @@ export type FolderPerson = {
   name: string;
   assetCount: number;
   assetId: string | null;
+  isPublic: boolean;
   faceBox: { x1: number; y1: number; x2: number; y2: number } | null;
 };
 

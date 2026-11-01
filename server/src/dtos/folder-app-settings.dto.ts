@@ -12,6 +12,11 @@ const FolderAppSettingsSchema = z
     flattenSubfolders: z
       .boolean()
       .describe('true: every subfolder is folded into its top-level folder. false: subfolders are shown as folders.'),
+    mode: z
+      .enum(['content', 'travel'])
+      .describe(
+        'content: private folder gallery for one user. travel: the same private side plus a public showcase of chosen trips.',
+      ),
   })
   .meta({ id: 'FolderAppSettingsDto' });
 
@@ -32,5 +37,14 @@ const FolderModeSchema = z
   .meta({ id: 'FolderModeDto' });
 
 export class FolderModeDto extends createZodDto(FolderModeSchema) {}
+
+const FolderPublicSchema = z
+  .object({
+    name: z.string().min(1).describe('Top-level folder name'),
+    isPublic: z.boolean().describe('Whether the folder is shown on the public side'),
+  })
+  .meta({ id: 'FolderPublicDto' });
+
+export class FolderPublicDto extends createZodDto(FolderPublicSchema) {}
 
 export class FolderAppSettingsDto extends createZodDto(FolderAppSettingsSchema) {}

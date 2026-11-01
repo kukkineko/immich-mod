@@ -5,3 +5,8 @@ services:
   immich-server:
     volumes:
       - ../xx:/media
+      # photos for the travel mode: paste trips as ./travel/<Trip name>/*.jpg, then add /media-travel as an
+      # external library in the admin settings. Travel mode reads this root.
+      - ../travel:/media-travel
+    environment:
+      IMMICH_TRAVEL_ROOT: /media-travel

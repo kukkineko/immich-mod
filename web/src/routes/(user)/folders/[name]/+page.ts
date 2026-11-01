@@ -8,9 +8,10 @@ export const load = (async ({ url, params, fetch }) => {
   // subfolders are addressed as /folders/<top>?sub=<a/b>
   const sub = url.searchParams.get('sub');
   const key = sub ? `${params.name}/${sub}` : params.name;
-  const [response, subfolderResponse] = await Promise.all([
+  const [response, subfolderResponse, people] = await Promise.all([
     fetch(assetsUrl(key, defaultQuery(), 0)),
     fetch(`/api/view/folder-people/subfolders?path=${encodeURIComponent(key)}`),
+    fetch('/api/view/folder-people'),
   ]);
 
   return {
@@ -20,5 +21,10 @@ export const load = (async ({ url, params, fetch }) => {
       ? ((await subfolderResponse.json()) as FolderSubfolders)
       : { flattenSubfolders: true, folders: [] },
     failed: !response.ok,
+    isPublic: people.ok
+      ? ((await people.json()) as { key: string; isPublic: boolean }[]).some(
+          (person) => person.key === params.name && person.isPublic,
+        )
+      : false,
   };
 }) satisfies PageLoad;

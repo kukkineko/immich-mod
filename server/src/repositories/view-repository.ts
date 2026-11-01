@@ -1,7 +1,7 @@
 import { Kysely, SelectQueryBuilder, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
-import { AssetVisibility } from 'src/enum';
+import { AssetType, AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { asUuid, withExif } from 'src/utils/database';
 import { FolderAssetFilter } from 'src/utils/folder-people';
@@ -99,12 +99,13 @@ export class ViewRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
-  async getFolderPeople(userId: string, root: string) {
+  async getFolderPeople(userId: string, root: string, imagesOnly = false) {
     const assets = this.folderAssets(userId, root);
+    const onlyImages = imagesOnly ? sql`and "type" = 'IMAGE'` : sql``;
 
     const counts = await sql<{ folder: string; count: number }>`
       with a as (${assets})
-      select folder, count(*)::int as count from a where folder is not null group by folder order by folder
+      select folder, count(*)::int as count from a where folder is not null ${onlyImages} group by folder order by folder
     `.execute(this.db);
 
     const faces = await sql<{
@@ -229,6 +230,7 @@ export class ViewRepository {
     filter: FolderAssetFilter,
     limit: number,
     offset: number,
+    imagesOnly = false,
   ) {
     return this.db
       .selectFrom('asset')
@@ -238,6 +240,7 @@ export class ViewRepository {
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.deletedAt', 'is', null)
       .where('asset.originalPath', 'like', `${escapeLike(root)}/${escapeLike(name)}/%`)
+      .$if(imagesOnly, (eb) => eb.where('asset.type', '=', AssetType.Image))
       .$if(!flatten, (eb) => eb.where('asset.originalPath', 'not like', `${escapeLike(root)}/${escapeLike(name)}/%/%`))
       .$call((qb) => applyAssetFilter(qb, filter))
       .limit(limit)

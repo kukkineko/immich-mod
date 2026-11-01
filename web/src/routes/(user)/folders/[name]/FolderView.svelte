@@ -23,9 +23,10 @@
     subfolders: FolderSubfolder[];
     flattenSubfolders: boolean;
     initialFailed: boolean;
+    initialPublic: boolean;
   }
 
-  let { folder, initialAssets, subfolders, flattenSubfolders, initialFailed }: Props = $props();
+  let { folder, initialAssets, subfolders, flattenSubfolders, initialFailed, initialPublic }: Props = $props();
 
   const parts = folder.split('/');
   const topFolder = parts[0];
@@ -110,6 +111,18 @@
   };
 
   // only a top-level folder has the choice; inside a subfolder everything below is folded anyway
+  let isPublic = $state(initialPublic);
+  const togglePublic = async () => {
+    const response = await fetch('/api/view/folder-people/public', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: topFolder, isPublic: !isPublic }),
+    });
+    if (response.ok) {
+      isPublic = !isPublic;
+    }
+  };
+
   const toggleSubfolders = async () => {
     const response = await fetch('/api/view/folder-people/mode', {
       method: 'PUT',
@@ -141,6 +154,16 @@
   <main class="mx-auto max-w-[2000px] space-y-6 p-4 sm:p-6">
     <div class="flex flex-wrap items-stretch gap-3">
       <div class="min-w-0 flex-1"><FilterBar bind:query /></div>
+      {#if parts.length === 1 && appSettings.mode === 'travel'}
+        <button
+          type="button"
+          class="flex items-center rounded-2xl border border-neutral-200 bg-white/70 px-4 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/50 dark:hover:bg-neutral-700"
+          aria-pressed={isPublic}
+          onclick={togglePublic}
+        >
+          {isPublic ? 'Public: on' : 'Public: off'}
+        </button>
+      {/if}
       {#if parts.length === 1}
         <button
           type="button"

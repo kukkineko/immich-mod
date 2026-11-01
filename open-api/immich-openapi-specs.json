@@ -17744,6 +17744,50 @@
         "x-immich-permission": "folder.read"
       }
     },
+    "/view/folder-people/public": {
+      "put": {
+        "description": "Mark a top-level folder as public or private. Only used in travel mode.",
+        "operationId": "setFolderPublic",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderPublicDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Show a folder on the public side",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
     "/view/folder-people/subfolders": {
       "get": {
         "description": "Retrieve the direct subfolders of a folder when subfolders are not folded into the main folder.",
@@ -17845,6 +17889,117 @@
         ],
         "x-immich-permission": "folder.read",
         "x-immich-state": "Stable"
+      }
+    },
+    "/view/public/file/{id}/{size}": {
+      "get": {
+        "description": "Thumbnail, preview or original of a photo in a public folder. Only available in travel mode.",
+        "operationId": "getPublicFile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Retrieve a public photo file",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ]
+      }
+    },
+    "/view/public/trips": {
+      "get": {
+        "description": "Public folders with their cover photo. Only available in travel mode.",
+        "operationId": "getPublicTrips",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicTripDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Retrieve public trips",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ]
+      }
+    },
+    "/view/public/trips/photos": {
+      "get": {
+        "description": "Photos of a public folder, oldest first. Only available in travel mode.",
+        "operationId": "getPublicTripPhotos",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicPhotoDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Retrieve public photos of a trip",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ]
       }
     },
     "/workflows": {
@@ -22707,6 +22862,14 @@
             "description": "true: every subfolder is folded into its top-level folder. false: subfolders are shown as folders.",
             "type": "boolean"
           },
+          "mode": {
+            "description": "content: private folder gallery for one user. travel: the same private side plus a public showcase of chosen trips.",
+            "enum": [
+              "content",
+              "travel"
+            ],
+            "type": "string"
+          },
           "pinMode": {
             "description": "every-load: ask for the PIN on every page load. session: PIN once per login. off: normal email and password login.",
             "enum": [
@@ -22725,6 +22888,7 @@
         },
         "required": [
           "flattenSubfolders",
+          "mode",
           "pinMode",
           "title"
         ],
@@ -22793,6 +22957,10 @@
             "description": "Face region to crop to, if the asset has a detected face",
             "nullable": true
           },
+          "isPublic": {
+            "description": "Whether the folder is shown on the public side (travel mode)",
+            "type": "boolean"
+          },
           "key": {
             "description": "Identifier used to request the assets of this entry",
             "type": "string"
@@ -22813,6 +22981,7 @@
           "assetCount",
           "assetId",
           "faceBox",
+          "isPublic",
           "key",
           "kind",
           "name"
@@ -22847,6 +23016,24 @@
           "x2",
           "y1",
           "y2"
+        ],
+        "type": "object"
+      },
+      "FolderPublicDto": {
+        "properties": {
+          "isPublic": {
+            "description": "Whether the folder is shown on the public side",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Top-level folder name",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "isPublic",
+          "name"
         ],
         "type": "object"
       },
@@ -26093,6 +26280,87 @@
         },
         "required": [
           "customCss"
+        ],
+        "type": "object"
+      },
+      "PublicPhotoDto": {
+        "properties": {
+          "camera": {
+            "nullable": true,
+            "type": "string"
+          },
+          "height": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "name": {
+            "description": "File name",
+            "type": "string"
+          },
+          "place": {
+            "description": "City and country",
+            "nullable": true,
+            "type": "string"
+          },
+          "settings": {
+            "description": "Aperture, exposure, focal length and ISO",
+            "nullable": true,
+            "type": "string"
+          },
+          "takenAt": {
+            "description": "Local date and time the photo was taken",
+            "type": "string"
+          },
+          "width": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "camera",
+          "height",
+          "id",
+          "name",
+          "place",
+          "settings",
+          "takenAt",
+          "width"
+        ],
+        "type": "object"
+      },
+      "PublicTripDto": {
+        "properties": {
+          "assetId": {
+            "description": "Cover photo",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Trip (top-level folder) name",
+            "type": "string"
+          },
+          "photoCount": {
+            "description": "Number of public photos",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "photoCount"
         ],
         "type": "object"
       },

@@ -19,6 +19,7 @@ const FolderPersonSchema = z
     assetCount: z.number().int().describe('Number of assets in the folder, including all subfolders'),
     assetId: z.uuidv4().nullable().describe('Representative asset used for the portrait'),
     faceBox: FolderPersonFaceBoxSchema.nullable().describe('Face region to crop to, if the asset has a detected face'),
+    isPublic: z.boolean().describe('Whether the folder is shown on the public side (travel mode)'),
   })
   .meta({ id: 'FolderPersonDto' });
 
@@ -43,6 +44,31 @@ const FolderSubfoldersSchema = z
   .meta({ id: 'FolderSubfoldersDto' });
 
 export class FolderSubfoldersDto extends createZodDto(FolderSubfoldersSchema) {}
+
+const PublicTripSchema = z
+  .object({
+    name: z.string().describe('Trip (top-level folder) name'),
+    photoCount: z.number().int().describe('Number of public photos'),
+    assetId: z.uuidv4().nullable().describe('Cover photo'),
+  })
+  .meta({ id: 'PublicTripDto' });
+
+export class PublicTripDto extends createZodDto(PublicTripSchema) {}
+
+const PublicPhotoSchema = z
+  .object({
+    id: z.uuidv4(),
+    name: z.string().describe('File name'),
+    width: z.number().int().nullable(),
+    height: z.number().int().nullable(),
+    takenAt: z.string().describe('Local date and time the photo was taken'),
+    place: z.string().nullable().describe('City and country'),
+    camera: z.string().nullable(),
+    settings: z.string().nullable().describe('Aperture, exposure, focal length and ISO'),
+  })
+  .meta({ id: 'PublicPhotoDto' });
+
+export class PublicPhotoDto extends createZodDto(PublicPhotoSchema) {}
 
 const LooseGroupSchema = z
   .object({
