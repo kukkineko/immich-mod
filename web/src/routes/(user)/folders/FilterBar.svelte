@@ -31,10 +31,10 @@
   <div class="flex flex-wrap items-center gap-2">
     <input
       type="search"
-      placeholder="Search by name"
-      class="{inputClass} max-w-56"
+      placeholder="Search names, text in pictures, places, people"
+      class="{inputClass} max-w-md min-w-[14rem] flex-1"
       bind:value={query.q}
-      aria-label="Search by name"
+      aria-label="Search"
     />
 
     <label class="flex items-center gap-1 text-sm">

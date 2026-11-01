@@ -12,7 +12,24 @@ const escapeLike = (value: string) => value.replaceAll(/[%_\\]/g, String.raw`\$&
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const applyAssetFilter = <QB extends SelectQueryBuilder<any, any, any>>(qb: QB, filter: FolderAssetFilter): QB => {
   let query: SelectQueryBuilder<any, any, any> = qb
-    .$if(!!filter.q, (eb) => eb.where('asset.originalFileName', 'ilike', `%${escapeLike(filter.q!)}%`))
+    .$if(!!filter.q, (eb) => {
+      // file name, place, caption, text found in the picture (OCR) and the names of recognised people
+      const like = `%${escapeLike(filter.q!)}%`;
+      return eb.where(
+        sql<boolean>`(
+          asset."originalFileName" ilike ${like}
+          or asset_exif."city" ilike ${like}
+          or asset_exif."state" ilike ${like}
+          or asset_exif."country" ilike ${like}
+          or asset_exif."description" ilike ${like}
+          or exists (select 1 from asset_ocr o where o."assetId" = asset.id and o."text" ilike ${like})
+          or exists (
+            select 1 from asset_face f inner join person p on p."personGroupId" = f."personGroupId"
+            where f."assetId" = asset.id and f."deletedAt" is null and p."name" ilike ${like}
+          )
+        )`,
+      );
+    })
     .$if(!!filter.takenFrom, (eb) => eb.where('asset.localDateTime', '>=', filter.takenFrom!))
     .$if(!!filter.takenTo, (eb) => eb.where('asset.localDateTime', '<', filter.takenTo!))
     .$if(!!filter.updatedFrom, (eb) => eb.where('asset.fileModifiedAt', '>=', filter.updatedFrom!))
