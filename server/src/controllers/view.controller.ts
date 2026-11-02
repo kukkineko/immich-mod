@@ -1,17 +1,38 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Next, Param, Put, Query, Res } from '@nestjs/common';
-import { NextFunction, Response } from 'express';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Next,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NextFunction, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto, FolderCoverDto, FolderModeDto, FolderPublicDto } from 'src/dtos/folder-app-settings.dto';
-import { FolderPersonDto, FolderSubfoldersDto, LooseGroupDto, PublicPhotoDto, PublicTripDto } from 'src/dtos/folder-person.dto';
-import { parseFolderAssetFilter } from 'src/utils/folder-people';
+import { FolderPersonDto, FolderSubfoldersDto, LooseGroupDto, PublicTripDto } from 'src/dtos/folder-person.dto';
+import {
+  PublicTripPageDto,
+  SiteCuratedCreateDto,
+  SiteTripDto,
+  SiteTripNameDto,
+  SiteTripSaveDto,
+  SiteTripSummaryDto,
+} from 'src/dtos/public-site.dto';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
 import { LoggingRepository } from 'src/repositories/logging.repository';
-import { sendFile } from 'src/utils/file';
 import { ViewService } from 'src/services/view.service';
+import { sendFile } from 'src/utils/file';
+import { parseFolderAssetFilter } from 'src/utils/folder-people';
 
 @ApiTags(ApiTag.Views)
 @Controller('view')
@@ -101,19 +122,15 @@ export class ViewController {
     return this.service.getPublicTrips();
   }
 
-  @Get('public/trips/photos')
+  @Get('public/trips/page')
   @Authenticated({ public: true })
   @Endpoint({
-    summary: 'Retrieve public photos of a trip',
-    description: 'Photos of a public folder, oldest first. Only available in travel mode.',
+    summary: 'Retrieve a public trip page',
+    description: 'Title, texts, layout and photos of a public trip. Only available in travel mode.',
     history: new HistoryBuilder().added('v2'),
   })
-  getPublicTripPhotos(@Query() query: Record<string, string | undefined>): Promise<PublicPhotoDto[]> {
-    return this.service.getPublicTripPhotos(
-      query.name ?? '',
-      Math.max(0, Number.parseInt(query.page ?? '0', 10) || 0),
-      Math.min(500, Math.max(1, Number.parseInt(query.size ?? '200', 10) || 200)),
-    );
+  getPublicTripPage(@Query('name') name = ''): Promise<PublicTripPageDto> {
+    return this.service.getPublicTripPage(name);
   }
 
   @Get('public/file/:id/:size')
@@ -131,6 +148,63 @@ export class ViewController {
     @Next() next: NextFunction,
   ) {
     await sendFile(res, next, () => this.service.getPublicFile(id, size), this.logger);
+  }
+
+  @Get('site/curated')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'List curated trips',
+    description: 'Curated trips take photos from any folder. Only used in travel mode.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getCuratedTrips(): Promise<SiteTripSummaryDto[]> {
+    return this.service.getCuratedTrips();
+  }
+
+  @Post('site/curated')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Create a curated trip',
+    description: 'Starts an empty, unpublished curated trip.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  createCuratedTrip(@Body() dto: SiteCuratedCreateDto): Promise<SiteTripNameDto> {
+    return this.service.createCuratedTrip(dto);
+  }
+
+  @Delete('site/curated')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Delete a curated trip',
+    description: 'Removes the trip page. The photos stay where they are.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  deleteCuratedTrip(@Query('name') name = ''): Promise<void> {
+    return this.service.deleteCuratedTrip(name);
+  }
+
+  @Get('site/trip')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Retrieve a trip for editing',
+    description: 'Layout, texts, visible photos and hidden photos of a folder trip or curated trip.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getSiteTrip(@Auth() auth: AuthDto, @Query('name') name = ''): Promise<SiteTripDto> {
+    return this.service.getSiteTrip(auth, name);
+  }
+
+  @Put('site/trip')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Save a trip',
+    description: 'Stores layout, texts and per-photo visibility of a folder trip or curated trip.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  saveSiteTrip(@Body() dto: SiteTripSaveDto): Promise<void> {
+    return this.service.saveSiteTrip(dto);
   }
 
   @Put('folder-people/mode')

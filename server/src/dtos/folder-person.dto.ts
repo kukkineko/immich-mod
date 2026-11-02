@@ -50,12 +50,16 @@ const PublicTripSchema = z
     name: z.string().describe('Trip (top-level folder) name'),
     photoCount: z.number().int().describe('Number of public photos'),
     assetId: z.uuidv4().nullable().describe('Cover photo'),
+    title: z.string().describe('Display title'),
+    intro: z.string().nullable().describe('Short text shown under the title'),
+    curated: z.boolean().describe('Curated trip (photos from any folder) instead of a folder'),
+    hasStory: z.boolean().describe('Whether the trip has a long story page'),
   })
   .meta({ id: 'PublicTripDto' });
 
 export class PublicTripDto extends createZodDto(PublicTripSchema) {}
 
-const PublicPhotoSchema = z
+export const PublicPhotoSchema = z
   .object({
     id: z.uuidv4(),
     name: z.string().describe('File name'),

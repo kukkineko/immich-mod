@@ -23,6 +23,7 @@
   <h1 class="min-w-0 flex-1 truncate text-xl font-semibold">{title}</h1>
   <nav class="flex items-center gap-1">
     {#if appSettings.mode === 'travel'}
+      <a href="/site" class={linkClass}>Edit site</a>
       <a href="/travel" class={linkClass}>Public site</a>
     {/if}
     <a href={Route.userSettings()} class="{linkClass} bg-primary text-light hover:bg-primary/90">Settings</a>

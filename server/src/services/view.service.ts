@@ -1,19 +1,44 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto, FolderCoverDto, FolderModeDto, FolderPublicDto } from 'src/dtos/folder-app-settings.dto';
-import { SystemMetadataKey } from 'src/enum';
-import { FolderPersonDto, FolderSubfoldersDto, LooseGroupDto, PublicPhotoDto, PublicTripDto } from 'src/dtos/folder-person.dto';
-import { CacheControl } from 'src/enum';
-import { ImmichFileResponse } from 'src/utils/file';
-import { mimeTypes } from 'src/utils/mime-types';
-import { FolderAssetFilter, groupLooseAssets, parseFolderAssetFilter } from 'src/utils/folder-people';
+import {
+  FolderPersonDto,
+  FolderSubfoldersDto,
+  LooseGroupDto,
+  PublicPhotoDto,
+  PublicTripDto,
+} from 'src/dtos/folder-person.dto';
+import {
+  PublicTripPageDto,
+  SiteCuratedCreateDto,
+  SiteTripDto,
+  SiteTripNameDto,
+  SiteTripSaveDto,
+  SiteTripSummaryDto,
+} from 'src/dtos/public-site.dto';
+import { CacheControl, SystemMetadataKey } from 'src/enum';
+import { ViewRepository } from 'src/repositories/view-repository';
 import { BaseService } from 'src/services/base.service';
+import { PublicSiteTrip } from 'src/types';
+import { ImmichFileResponse } from 'src/utils/file';
+import { FolderAssetFilter, groupLooseAssets, parseFolderAssetFilter } from 'src/utils/folder-people';
+import { mimeTypes } from 'src/utils/mime-types';
+import {
+  CURATED_PREFIX,
+  cleanBlocks,
+  curatedPhotoIds,
+  isCuratedName,
+  isPhotoVisible,
+  resolveBlocks,
+} from 'src/utils/public-site';
 
 /** Top-level folders below this path are treated as people. Set IMMICH_FOLDER_ROOT to change it. */
 const contentRoot = () => (process.env.IMMICH_FOLDER_ROOT || '/media').replaceAll(/\/+$/g, '');
 /** Travel mode can read from its own root, so one development stack can hold both libraries. */
-const travelRoot = () => (process.env.IMMICH_TRAVEL_ROOT || process.env.IMMICH_FOLDER_ROOT || '/media').replaceAll(/\/+$/g, '');
+const travelRoot = () =>
+  (process.env.IMMICH_TRAVEL_ROOT || process.env.IMMICH_FOLDER_ROOT || '/media').replaceAll(/\/+$/g, '');
 
 @Injectable()
 export class ViewService extends BaseService {
@@ -179,11 +204,7 @@ export class ViewService extends BaseService {
     const groupIds = [...new Set(faces.map((face) => face.personGroupId).filter((id): id is string => !!id))];
     const names = await this.viewRepository.getPersonGroupNames(auth.user.id, groupIds);
 
-    return groupLooseAssets(
-      assets,
-      faces,
-      new Map(names.map((row) => [row.personGroupId, row.name])),
-    );
+    return groupLooseAssets(assets, faces, new Map(names.map((row) => [row.personGroupId, row.name])));
   }
 
   async getAssetsByFolderPerson(
@@ -210,7 +231,7 @@ export class ViewService extends BaseService {
     return assets.map((asset) => mapAsset(asset, { auth }));
   }
 
-  /** The public side only exists in travel mode and only ever shows folders that were marked public. */
+  /** The public side only exists in travel mode and only ever shows what was marked public. */
   private async requireTravel() {
     if ((await this.getAppSettings()).mode !== 'travel') {
       throw new NotFoundException();
@@ -222,56 +243,176 @@ export class ViewService extends BaseService {
     return admin.id;
   }
 
-  async getPublicTrips(): Promise<PublicTripDto[]> {
-    const ownerId = await this.requireTravel();
-    const people = await this.buildFolderPeople(ownerId, true);
-    return people
-      .filter((person) => person.isPublic)
-      .map((person) => ({ name: person.name, photoCount: person.assetCount, assetId: person.assetId }));
+  private async getSite() {
+    return (await this.systemMetadataRepository.get(SystemMetadataKey.PublicSite)) ?? {};
   }
 
-  private async requirePublicTrip(name: string) {
-    const ownerId = await this.requireTravel();
-    const flags = (await this.systemMetadataRepository.get(SystemMetadataKey.FolderPublic)) ?? {};
-    if (!this.isSafePath(name) || name.includes('/') || !flags[name]) {
-      throw new NotFoundException();
+  private async getFolderFlags() {
+    return (await this.systemMetadataRepository.get(SystemMetadataKey.FolderPublic)) ?? {};
+  }
+
+  private toPublicPhoto(row: Awaited<ReturnType<ViewRepository['getImagesByIds']>>[number]): PublicPhotoDto {
+    const exif = row.exifInfo;
+    const details = [
+      exif?.fNumber ? `ƒ/${exif.fNumber}` : undefined,
+      exif?.exposureTime ? `${exif.exposureTime}s` : undefined,
+      exif?.focalLength ? `${exif.focalLength} mm` : undefined,
+      exif?.iso ? `ISO ${exif.iso}` : undefined,
+    ].filter(Boolean);
+    const place = [exif?.city, exif?.country].filter(Boolean).join(', ');
+    const camera = [exif?.make, exif?.model].filter(Boolean).join(' ');
+    return {
+      id: row.id,
+      name: row.originalFileName,
+      width: exif?.exifImageWidth ?? null,
+      height: exif?.exifImageHeight ?? null,
+      takenAt: new Date(row.localDateTime).toISOString(),
+      place: place || null,
+      camera: camera || null,
+      settings: details.length > 0 ? details.join('  ·  ') : null,
+    };
+  }
+
+  /** Every image of a trip, split into the ones the public may see and the ones they may not. */
+  private async loadTripPhotos(ownerId: string, name: string, trip: PublicSiteTrip | undefined, folderPublic: boolean) {
+    if (isCuratedName(name)) {
+      return {
+        visible: await this.viewRepository.getImagesByIds(ownerId, [...new Set(curatedPhotoIds(trip))]),
+        hidden: [],
+      };
     }
-    return ownerId;
-  }
-
-  async getPublicTripPhotos(name: string, page: number, size: number): Promise<PublicPhotoDto[]> {
-    const ownerId = await this.requirePublicTrip(name);
     const rows = await this.viewRepository.getAssetsByFolderPerson(
       ownerId,
       await this.getFolderRoot(),
       name,
       true,
       parseFolderAssetFilter({ sort: 'taken', dir: 'asc' }),
-      size,
-      page * size,
+      5000,
+      0,
       true,
     );
-    return rows.map((row) => {
-      const exif = row.exifInfo;
-      const details = [
-        exif?.fNumber ? `\u0192/${exif.fNumber}` : undefined,
-        exif?.exposureTime ? `${exif.exposureTime}s` : undefined,
-        exif?.focalLength ? `${exif.focalLength} mm` : undefined,
-        exif?.iso ? `ISO ${exif.iso}` : undefined,
-      ].filter(Boolean);
-      const place = [exif?.city, exif?.country].filter(Boolean).join(', ');
-      const camera = [exif?.make, exif?.model].filter(Boolean).join(' ');
-      return {
-        id: row.id,
-        name: row.originalFileName,
-        width: exif?.exifImageWidth ?? null,
-        height: exif?.exifImageHeight ?? null,
-        takenAt: new Date(row.localDateTime).toISOString(),
-        place: place || null,
-        camera: camera || null,
-        settings: details.length > 0 ? details.join('  \u00b7  ') : null,
-      };
-    });
+    return {
+      visible: rows.filter((row) => isPhotoVisible(trip, folderPublic, row.id)),
+      hidden: rows.filter((row) => !isPhotoVisible(trip, folderPublic, row.id)),
+    };
+  }
+
+  private async buildTripPage(ownerId: string, name: string) {
+    const site = await this.getSite();
+    const trip = site[name];
+    const curated = isCuratedName(name);
+    if (curated && !trip?.curated) {
+      throw new NotFoundException();
+    }
+    const folderPublic = !curated && !!(await this.getFolderFlags())[name];
+    const { visible, hidden } = await this.loadTripPhotos(ownerId, name, trip, folderPublic);
+
+    const blocks = resolveBlocks(
+      trip?.blocks,
+      visible.map((row) => ({ id: row.id, takenAt: row.localDateTime })),
+    );
+    const byId = new Map(visible.map((row) => [row.id, this.toPublicPhoto(row)]));
+    const photos = blocks.flatMap((block) =>
+      block.type === 'photo' && block.id && byId.has(block.id) ? [byId.get(block.id)!] : [],
+    );
+    const cover = (await this.systemMetadataRepository.get(SystemMetadataKey.FolderCovers))?.[name];
+
+    return {
+      curated,
+      folderPublic,
+      published: !!trip?.published,
+      hidden: hidden.map((row) => this.toPublicPhoto(row)),
+      page: {
+        name,
+        title: trip?.title?.trim() || (curated ? 'Untitled trip' : name),
+        intro: trip?.intro?.trim() || null,
+        story: trip?.story?.trim() || null,
+        assetId: cover && byId.has(cover) ? cover : (photos[0]?.id ?? null),
+        photos,
+        blocks,
+      },
+    };
+  }
+
+  async getPublicTrips(): Promise<PublicTripDto[]> {
+    const ownerId = await this.requireTravel();
+    const site = await this.getSite();
+    const people = await this.buildFolderPeople(ownerId, true);
+    const trips: PublicTripDto[] = [];
+
+    for (const person of people) {
+      const trip = site[person.name];
+      const hasShown = Object.values(trip?.overrides ?? {}).some(Boolean);
+      if (isCuratedName(person.name) || (!person.isPublic && !hasShown)) {
+        continue;
+      }
+      let photoCount = person.assetCount;
+      let assetId = person.assetId;
+      if (Object.keys(trip?.overrides ?? {}).length > 0) {
+        // single photos were hidden or published by hand: count what is really visible
+        const { visible } = await this.loadTripPhotos(ownerId, person.name, trip, person.isPublic);
+        if (visible.length === 0) {
+          continue;
+        }
+        photoCount = visible.length;
+        assetId = visible.some((row) => row.id === assetId) ? assetId : visible[0].id;
+      }
+      trips.push({
+        name: person.name,
+        title: trip?.title?.trim() || person.name,
+        intro: trip?.intro?.trim() || null,
+        curated: false,
+        hasStory: !!trip?.story?.trim(),
+        photoCount,
+        assetId,
+      });
+    }
+
+    for (const [name, trip] of Object.entries(site)) {
+      if (!trip.curated || !trip.published) {
+        continue;
+      }
+      const { visible } = await this.loadTripPhotos(ownerId, name, trip, false);
+      const first = resolveBlocks(
+        trip.blocks,
+        visible.map((row) => ({ id: row.id, takenAt: row.localDateTime })),
+      ).find((block) => block.type === 'photo');
+      if (!first?.id) {
+        continue;
+      }
+      trips.push({
+        name,
+        title: trip.title?.trim() || 'Untitled trip',
+        intro: trip.intro?.trim() || null,
+        curated: true,
+        hasStory: !!trip.story?.trim(),
+        photoCount: visible.length,
+        assetId: first.id,
+      });
+    }
+    return trips;
+  }
+
+  private async requirePublicTrip(name: string) {
+    const ownerId = await this.requireTravel();
+    const trip = (await this.getSite())[name];
+    if (isCuratedName(name)) {
+      if (!trip?.curated || !trip.published) {
+        throw new NotFoundException();
+      }
+      return ownerId;
+    }
+    const folderPublic = !!(await this.getFolderFlags())[name];
+    const hasShown = Object.values(trip?.overrides ?? {}).some(Boolean);
+    if (!this.isSafePath(name) || name.includes('/') || (!folderPublic && !hasShown)) {
+      throw new NotFoundException();
+    }
+    return ownerId;
+  }
+
+  async getPublicTripPage(name: string): Promise<PublicTripPageDto> {
+    const ownerId = await this.requirePublicTrip(name);
+    return (await this.buildTripPage(ownerId, name)).page;
   }
 
   async getPublicFile(id: string, size: string): Promise<ImmichFileResponse> {
@@ -279,24 +420,26 @@ export class ViewService extends BaseService {
     const { originalPath } = await this.assetRepository.getForOriginal(id, false);
     const root = await this.getFolderRoot();
     const relative = originalPath?.startsWith(`${root}/`) ? originalPath.slice(root.length + 1) : undefined;
-    const top = relative?.split('/')[0];
-    const flags = (await this.systemMetadataRepository.get(SystemMetadataKey.FolderPublic)) ?? {};
-    // the file must sit in a public folder (not loose in the root) and belong to the library owner
-    if (!relative || !relative.includes('/') || !top || !flags[top]) {
+    if (!relative) {
       throw new NotFoundException();
     }
-    const [asset] = await this.viewRepository.getAssetsByIds(ownerId, [id], parseFolderAssetFilter({}), 1, 0);
-    if (!asset || asset.type !== 'IMAGE') {
+    const top = relative.includes('/') ? relative.split('/')[0] : undefined;
+    const site = await this.getSite();
+    const flags = await this.getFolderFlags();
+    // the file must be public through its folder (not loose in the root) or through a published curated trip
+    const viaFolder = !!top && !isCuratedName(top) && isPhotoVisible(site[top], !!flags[top], id);
+    const viaCurated = Object.values(site).some(
+      (trip) => trip.curated && trip.published && curatedPhotoIds(trip).includes(id),
+    );
+    if (!viaFolder && !viaCurated) {
+      throw new NotFoundException();
+    }
+    const [asset] = await this.viewRepository.getImagesByIds(ownerId, [id]);
+    if (!asset) {
       throw new NotFoundException();
     }
 
-    if (size === 'original') {
-      return new ImmichFileResponse({
-        path: originalPath!,
-        contentType: mimeTypes.lookup(originalPath!),
-        cacheControl: CacheControl.PrivateWithCache,
-      });
-    }
+    // the public side never serves the camera original, whatever size was asked for
     const type = size === 'thumbnail' ? 'thumbnail' : 'preview';
     const { path } = await this.assetRepository.getForThumbnail(id, type as never, false);
     if (!path) {
@@ -307,6 +450,81 @@ export class ViewService extends BaseService {
       contentType: mimeTypes.lookup(path),
       cacheControl: CacheControl.PrivateWithCache,
     });
+  }
+
+  private requireEditableTrip(site: Record<string, PublicSiteTrip>, name: string) {
+    const valid = isCuratedName(name) ? !!site[name]?.curated : this.isSafePath(name) && !name.includes('/');
+    if (!valid) {
+      throw new NotFoundException();
+    }
+  }
+
+  async getSiteTrip(auth: AuthDto, name: string): Promise<SiteTripDto> {
+    this.requireEditableTrip(await this.getSite(), name);
+    const { page, curated, folderPublic, published, hidden } = await this.buildTripPage(auth.user.id, name);
+    return { ...page, curated, folderPublic, published, hidden };
+  }
+
+  async saveSiteTrip(dto: SiteTripSaveDto): Promise<void> {
+    const site = { ...(await this.getSite()) };
+    this.requireEditableTrip(site, dto.name);
+    const curated = isCuratedName(dto.name);
+    const seen = new Set<string>();
+    const blocks = cleanBlocks(dto.blocks).filter((block) => {
+      if (block.type !== 'photo') {
+        return true;
+      }
+      const duplicate = seen.has(block.id!);
+      seen.add(block.id!);
+      return !duplicate;
+    });
+    site[dto.name] = {
+      ...(curated ? { curated: true, published: dto.published ?? site[dto.name]?.published ?? false } : {}),
+      title: dto.title?.trim() || undefined,
+      intro: dto.intro?.trim() || undefined,
+      story: dto.story?.trim() || undefined,
+      blocks,
+      ...(curated ? {} : { overrides: dto.overrides ?? {} }),
+    };
+    await this.systemMetadataRepository.set(SystemMetadataKey.PublicSite, site);
+  }
+
+  async createCuratedTrip(dto: SiteCuratedCreateDto): Promise<SiteTripNameDto> {
+    const site = { ...(await this.getSite()) };
+    const slug = dto.title
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/g, '-')
+      .replaceAll(/^-|-$/g, '')
+      .slice(0, 30);
+    const name = `${CURATED_PREFIX}${slug ? `${slug}-` : ''}${randomBytes(3).toString('hex')}`;
+    site[name] = { curated: true, published: false, title: dto.title.trim(), blocks: [] };
+    await this.systemMetadataRepository.set(SystemMetadataKey.PublicSite, site);
+    return { name };
+  }
+
+  async deleteCuratedTrip(name: string): Promise<void> {
+    const site = { ...(await this.getSite()) };
+    if (!isCuratedName(name) || !site[name]?.curated) {
+      throw new NotFoundException();
+    }
+    delete site[name];
+    await this.systemMetadataRepository.set(SystemMetadataKey.PublicSite, site);
+  }
+
+  async getCuratedTrips(): Promise<SiteTripSummaryDto[]> {
+    return Object.entries(await this.getSite())
+      .filter(([, trip]) => trip.curated)
+      .map(([name, trip]) => {
+        const ids = curatedPhotoIds(trip);
+        return {
+          name,
+          title: trip.title?.trim() || 'Untitled trip',
+          curated: true,
+          published: !!trip.published,
+          photoCount: ids.length,
+          assetId: ids[0] ?? null,
+        };
+      });
   }
 
   async getAssetsByOriginalPath(auth: AuthDto, path: string): Promise<AssetResponseDto[]> {

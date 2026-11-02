@@ -12,6 +12,9 @@
   let previewing = $state(false);
   let previewFailed = $state(false);
   let sourceIndex = $state(0);
+  let videoIndex = $state(0);
+  // the transcoded copy first; the original when that one is missing or cannot be played
+  const videoSources = $derived([`/api/assets/${asset.id}/video/playback`, `/api/assets/${asset.id}/original`]);
   const sources = $derived(pictureSources(asset.id, asset.type === 'IMAGE'));
   const imageFailed = $derived(sourceIndex >= sources.length);
   let holdTimer: ReturnType<typeof setTimeout> | undefined;
@@ -121,14 +124,19 @@
     {/if}
     {#if previewing}
       <video
-        src="/api/assets/{asset.id}/video/playback"
+        src={videoSources[videoIndex]}
         muted
         loop
         autoplay
         playsinline
         preload="auto"
         class="pointer-events-none absolute inset-0 h-full w-full bg-black object-cover"
+        oncanplay={(event) => void event.currentTarget.play().catch(() => undefined)}
         onerror={() => {
+          if (videoIndex + 1 < videoSources.length) {
+            videoIndex++;
+            return;
+          }
           previewFailed = true;
           previewing = false;
         }}

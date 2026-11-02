@@ -557,7 +557,36 @@ export interface SystemMetadata extends Record<SystemMetadataKey, Record<string,
   [SystemMetadataKey.FolderCovers]: Record<string, string>;
   [SystemMetadataKey.FolderModes]: Record<string, boolean>;
   [SystemMetadataKey.FolderPublic]: Record<string, boolean>;
+  [SystemMetadataKey.PublicSite]: Record<string, PublicSiteTrip>;
 }
+
+/** One piece of a public trip page: a photo, a heading or a block of text */
+export type PublicSiteBlock = {
+  type: 'photo' | 'heading' | 'text';
+  /** photo blocks: asset id */
+  id?: string;
+  size?: 'wide' | 'full';
+  caption?: string;
+  /** heading and text blocks */
+  text?: string;
+};
+
+/**
+ * Layout and story of a public trip. A trip is a top-level folder (name = folder) or a curated trip (name starts with
+ * `~`, photos can come from any folder).
+ */
+export type PublicSiteTrip = {
+  curated?: boolean;
+  /** curated trips only appear on the public side once published */
+  published?: boolean;
+  title?: string;
+  intro?: string;
+  story?: string;
+  /** manual layout; visible photos that are not listed follow at the end, oldest first */
+  blocks?: PublicSiteBlock[];
+  /** folder trips: per-photo exceptions to the folder's public flag */
+  overrides?: Record<string, boolean>;
+};
 
 export type UserPreferences = {
   albums: {

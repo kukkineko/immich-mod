@@ -5,8 +5,14 @@ import { AssetType, AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { asUuid, withExif } from 'src/utils/database';
 import { FolderAssetFilter } from 'src/utils/folder-people';
+import { mimeTypes } from 'src/utils/mime-types';
 
 const escapeRegex = (value: string) => value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+// camera RAW files are never listed: only their JPEG siblings matter here
+const rawPattern = String.raw`\.(${Object.keys(mimeTypes.raw)
+  .map((ext) => ext.slice(1))
+  .join('|')})$`;
+const notRaw = sql<boolean>`asset."originalPath" !~* ${rawPattern}`;
 const escapeLike = (value: string) => value.replaceAll(/[%_\\]/g, String.raw`\$&`);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,6 +76,7 @@ export class ViewRepository {
       .distinct()
       .where('ownerId', '=', asUuid(userId))
       .where('visibility', '=', AssetVisibility.Timeline)
+      .where(notRaw)
       .where('deletedAt', 'is', null)
       .where('fileCreatedAt', 'is not', null)
       .where('fileModifiedAt', 'is not', null)
@@ -90,6 +97,7 @@ export class ViewRepository {
       .$call(withExif)
       .where('ownerId', '=', asUuid(userId))
       .where('visibility', '=', AssetVisibility.Timeline)
+      .where(notRaw)
       .where('deletedAt', 'is', null)
       .where('fileCreatedAt', 'is not', null)
       .where('fileModifiedAt', 'is not', null)
@@ -110,6 +118,7 @@ export class ViewRepository {
       from asset a
       where a."ownerId" = ${userId}
         and a.visibility = ${AssetVisibility.Timeline}
+        and a."originalPath" !~* ${rawPattern}
         and a."deletedAt" is null
         and a."originalPath" like ${escapeLike(root) + '/%'}
     `;
@@ -163,6 +172,7 @@ export class ViewRepository {
       .select(['asset.id', 'asset.type', 'asset.localDateTime'])
       .where('ownerId', '=', asUuid(userId))
       .where('visibility', '=', AssetVisibility.Timeline)
+      .where(notRaw)
       .where('deletedAt', 'is', null)
       .where('originalPath', 'like', `${escapeLike(root)}/%`)
       .where('originalPath', 'not like', `${escapeLike(root)}/%/%`)
@@ -214,9 +224,28 @@ export class ViewRepository {
       .$call(withExif)
       .where('asset.ownerId', '=', asUuid(userId))
       .where('asset.id', 'in', ids)
+      .where(notRaw)
       .$call((qb) => applyAssetFilter(qb, filter))
       .limit(limit)
       .offset(offset)
+      .execute();
+  }
+
+  /** Images only: a public page never shows videos, and trashed or hidden assets are skipped. */
+  getImagesByIds(userId: string, ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.db
+      .selectFrom('asset')
+      .selectAll('asset')
+      .$call(withExif)
+      .where('asset.ownerId', '=', asUuid(userId))
+      .where('asset.id', 'in', ids)
+      .where(notRaw)
+      .where('asset.type', '=', AssetType.Image)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
       .execute();
   }
 
@@ -230,7 +259,8 @@ export class ViewRepository {
         from asset a
         where a."ownerId" = ${userId}
           and a.visibility = ${AssetVisibility.Timeline}
-          and a."deletedAt" is null
+          and a."originalPath" !~* ${rawPattern}
+        and a."deletedAt" is null
           and a."originalPath" like ${escapeLike(base) + '/%'}
       ) t
       where sub is not null
@@ -255,6 +285,7 @@ export class ViewRepository {
       .$call(withExif)
       .where('asset.ownerId', '=', asUuid(userId))
       .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where(notRaw)
       .where('asset.deletedAt', 'is', null)
       .where('asset.originalPath', 'like', `${escapeLike(root)}/${escapeLike(name)}/%`)
       .$if(imagesOnly, (eb) => eb.where('asset.type', '=', AssetType.Image))

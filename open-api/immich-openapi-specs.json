@@ -17970,27 +17970,31 @@
         ]
       }
     },
-    "/view/public/trips/photos": {
+    "/view/public/trips/page": {
       "get": {
-        "description": "Photos of a public folder, oldest first. Only available in travel mode.",
-        "operationId": "getPublicTripPhotos",
-        "parameters": [],
+        "description": "Title, texts, layout and photos of a public trip. Only available in travel mode.",
+        "operationId": "getPublicTripPage",
+        "parameters": [
+          {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/PublicPhotoDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PublicTripPageDto"
                 }
               }
             },
             "description": ""
           }
         },
-        "summary": "Retrieve public photos of a trip",
+        "summary": "Retrieve a public trip page",
         "tags": [
           "Views"
         ],
@@ -18000,6 +18004,228 @@
             "state": "Added"
           }
         ]
+      }
+    },
+    "/view/site/curated": {
+      "delete": {
+        "description": "Removes the trip page. The photos stay where they are.",
+        "operationId": "deleteCuratedTrip",
+        "parameters": [
+          {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete a curated trip",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      },
+      "get": {
+        "description": "Curated trips take photos from any folder. Only used in travel mode.",
+        "operationId": "getCuratedTrips",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SiteTripSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List curated trips",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      },
+      "post": {
+        "description": "Starts an empty, unpublished curated trip.",
+        "operationId": "createCuratedTrip",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteCuratedCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteTripNameDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Create a curated trip",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
+    "/view/site/trip": {
+      "get": {
+        "description": "Layout, texts, visible photos and hidden photos of a folder trip or curated trip.",
+        "operationId": "getSiteTrip",
+        "parameters": [
+          {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteTripDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve a trip for editing",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      },
+      "put": {
+        "description": "Stores layout, texts and per-photo visibility of a folder trip or curated trip.",
+        "operationId": "saveSiteTrip",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteTripSaveDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Save a trip",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
       }
     },
     "/workflows": {
@@ -22870,6 +23096,10 @@
             ],
             "type": "string"
           },
+          "pinConfigured": {
+            "description": "Read only: whether any user has set a PIN yet. Without one the PIN screen is skipped.",
+            "type": "boolean"
+          },
           "pinMode": {
             "description": "every-load: ask for the PIN on every page load. session: PIN once per login. off: normal email and password login.",
             "enum": [
@@ -26201,6 +26431,47 @@
         ],
         "type": "object"
       },
+      "PublicBlockDto": {
+        "properties": {
+          "caption": {
+            "description": "Photo blocks: caption under the photo",
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "id": {
+            "description": "Photo blocks: asset id",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "size": {
+            "description": "Photo blocks: span more than a normal row slot",
+            "enum": [
+              "wide",
+              "full"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "description": "Heading and text blocks: the text",
+            "maxLength": 20000,
+            "type": "string"
+          },
+          "type": {
+            "description": "What the block shows",
+            "enum": [
+              "photo",
+              "heading",
+              "text"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
       "PublicConfigDto": {
         "description": "Configuration properties that are visible to everyone",
         "properties": {
@@ -26346,6 +26617,19 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
             "type": "string"
           },
+          "curated": {
+            "description": "Curated trip (photos from any folder) instead of a folder",
+            "type": "boolean"
+          },
+          "hasStory": {
+            "description": "Whether the trip has a long story page",
+            "type": "boolean"
+          },
+          "intro": {
+            "description": "Short text shown under the title",
+            "nullable": true,
+            "type": "string"
+          },
           "name": {
             "description": "Trip (top-level folder) name",
             "type": "string"
@@ -26355,12 +26639,71 @@
             "maximum": 9007199254740991,
             "minimum": -9007199254740991,
             "type": "integer"
+          },
+          "title": {
+            "description": "Display title",
+            "type": "string"
           }
         },
         "required": [
           "assetId",
+          "curated",
+          "hasStory",
+          "intro",
           "name",
-          "photoCount"
+          "photoCount",
+          "title"
+        ],
+        "type": "object"
+      },
+      "PublicTripPageDto": {
+        "properties": {
+          "assetId": {
+            "description": "Cover photo",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "blocks": {
+            "description": "Page layout in order",
+            "items": {
+              "$ref": "#/components/schemas/PublicBlockDto"
+            },
+            "type": "array"
+          },
+          "intro": {
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Folder name, or the id of a curated trip",
+            "type": "string"
+          },
+          "photos": {
+            "description": "Every visible photo, in page order",
+            "items": {
+              "$ref": "#/components/schemas/PublicPhotoDto"
+            },
+            "type": "array"
+          },
+          "story": {
+            "description": "Long story as light markdown, null when there is none",
+            "nullable": true,
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "blocks",
+          "intro",
+          "name",
+          "photos",
+          "story",
+          "title"
         ],
         "type": "object"
       },
@@ -28889,6 +29232,182 @@
           "email",
           "name",
           "password"
+        ],
+        "type": "object"
+      },
+      "SiteCuratedCreateDto": {
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "SiteTripDto": {
+        "properties": {
+          "assetId": {
+            "description": "Cover photo",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "blocks": {
+            "description": "Page layout in order",
+            "items": {
+              "$ref": "#/components/schemas/PublicBlockDto"
+            },
+            "type": "array"
+          },
+          "curated": {
+            "type": "boolean"
+          },
+          "folderPublic": {
+            "description": "Folder trips only: whether the folder itself is public",
+            "type": "boolean"
+          },
+          "hidden": {
+            "description": "Folder trips only: photos that are currently not public",
+            "items": {
+              "$ref": "#/components/schemas/PublicPhotoDto"
+            },
+            "type": "array"
+          },
+          "intro": {
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Folder name, or the id of a curated trip",
+            "type": "string"
+          },
+          "photos": {
+            "description": "Every visible photo, in page order",
+            "items": {
+              "$ref": "#/components/schemas/PublicPhotoDto"
+            },
+            "type": "array"
+          },
+          "published": {
+            "description": "Curated trips only: shown on the public side",
+            "type": "boolean"
+          },
+          "story": {
+            "description": "Long story as light markdown, null when there is none",
+            "nullable": true,
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "blocks",
+          "curated",
+          "folderPublic",
+          "hidden",
+          "intro",
+          "name",
+          "photos",
+          "published",
+          "story",
+          "title"
+        ],
+        "type": "object"
+      },
+      "SiteTripNameDto": {
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "SiteTripSaveDto": {
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBlockDto"
+            },
+            "maxItems": 5000,
+            "type": "array"
+          },
+          "intro": {
+            "maxLength": 5000,
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "overrides": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "Folder trips: per-photo public flag",
+            "type": "object"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "story": {
+            "maxLength": 100000,
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "blocks",
+          "name"
+        ],
+        "type": "object"
+      },
+      "SiteTripSummaryDto": {
+        "properties": {
+          "assetId": {
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "curated": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "photoCount": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "curated",
+          "name",
+          "photoCount",
+          "published",
+          "title"
         ],
         "type": "object"
       },

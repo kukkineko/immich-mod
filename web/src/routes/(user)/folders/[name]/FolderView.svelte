@@ -31,7 +31,10 @@
   const parts = folder.split('/');
   const topFolder = parts[0];
   const title = parts.join(' / ');
-  const backHref = parts.length > 1 ? `/folders/${encodeURIComponent(topFolder)}${parts.length > 2 ? `?sub=${encodeURIComponent(parts.slice(1, -1).join('/'))}` : ''}` : '/folders';
+  const backHref =
+    parts.length > 1
+      ? `/folders/${encodeURIComponent(topFolder)}${parts.length > 2 ? `?sub=${encodeURIComponent(parts.slice(1, -1).join('/'))}` : ''}`
+      : '/folders';
 
   let query = $state<AssetQuery>(defaultQuery());
   let assets = $state<FolderAsset[]>(initialAssets);
@@ -163,6 +166,12 @@
         >
           {isPublic ? 'Public: on' : 'Public: off'}
         </button>
+        <a
+          href="/site/{encodeURIComponent(topFolder)}"
+          class="flex items-center rounded-2xl border border-neutral-200 bg-white/70 px-4 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/50 dark:hover:bg-neutral-700"
+        >
+          Edit public page
+        </a>
       {/if}
       {#if parts.length === 1}
         <button
@@ -181,11 +190,15 @@
         {#each subfolders as sub (sub.path)}
           <li>
             <a
-              href="/folders/{encodeURIComponent(topFolder)}?sub={encodeURIComponent(parts.slice(1).concat(sub.name).join('/'))}"
+              href="/folders/{encodeURIComponent(topFolder)}?sub={encodeURIComponent(
+                parts.slice(1).concat(sub.name).join('/'),
+              )}"
               class="group relative block overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5"
             >
               <PersonPortrait assetId={sub.assetId} faceBox={null} alt={sub.name} />
-              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 pt-10 text-white">
+              <div
+                class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 pt-10 text-white"
+              >
                 <p class="truncate font-semibold">{sub.name}</p>
                 <p class="text-xs text-white/70">{sub.assetCount} items</p>
               </div>
