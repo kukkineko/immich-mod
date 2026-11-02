@@ -45,6 +45,15 @@ const FolderSubfoldersSchema = z
 
 export class FolderSubfoldersDto extends createZodDto(FolderSubfoldersSchema) {}
 
+const FolderTreeEntrySchema = z
+  .object({
+    path: z.string().describe('Path relative to the library root, at any depth'),
+    count: z.number().int().describe('Number of images in this folder, subfolders included'),
+  })
+  .meta({ id: 'FolderTreeEntryDto' });
+
+export class FolderTreeEntryDto extends createZodDto(FolderTreeEntrySchema) {}
+
 const PublicTripSchema = z
   .object({
     name: z.string().describe('Trip (top-level folder) name'),

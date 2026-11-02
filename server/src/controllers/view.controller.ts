@@ -18,7 +18,7 @@ import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto, FolderCoverDto, FolderModeDto, FolderPublicDto } from 'src/dtos/folder-app-settings.dto';
-import { FolderPersonDto, FolderSubfoldersDto, LooseGroupDto, PublicTripDto } from 'src/dtos/folder-person.dto';
+import { FolderPersonDto, FolderTreeEntryDto, FolderSubfoldersDto, LooseGroupDto, PublicTripDto } from 'src/dtos/folder-person.dto';
 import {
   PublicTripPageDto,
   SiteCuratedCreateDto,
@@ -248,7 +248,19 @@ export class ViewController {
       parseFolderAssetFilter(query),
       Math.max(0, Number.parseInt(page ?? '0', 10) || 0),
       Math.min(500, Math.max(1, Number.parseInt(size ?? '200', 10) || 200)),
+      query.deep === 'true',
     );
+  }
+
+  @Get('folder-people/tree')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Retrieve folder tree',
+    description: 'Retrieve every folder at any depth with the number of images below it.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getFolderTree(): Promise<FolderTreeEntryDto[]> {
+    return this.service.getFolderTree();
   }
 
   @Get('folder/unique-paths')

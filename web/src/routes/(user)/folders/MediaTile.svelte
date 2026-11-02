@@ -78,6 +78,18 @@
     window.addEventListener('scroll', end, { capture: true, once: true });
   };
 
+  // Android Chrome reports a long press as a context menu, and may swallow the touch events that follow;
+  // start the preview from that as well, so it does not depend on the touch timer surviving
+  const oncontextmenu = (event: MouseEvent) => {
+    event.preventDefault();
+    if (matchMedia('(hover: none)').matches) {
+      clearTimeout(holdTimer);
+      touchPreviewed = true;
+      start();
+      ontouchcancel();
+    }
+  };
+
   const onclick = (event: MouseEvent) => {
     // releasing a press-and-hold must not also open the viewer
     if (touchPreviewed) {
@@ -104,7 +116,7 @@
     {ontouchmove}
     ontouchend={stop}
     {ontouchcancel}
-    oncontextmenu={(event) => event.preventDefault()}
+    {oncontextmenu}
     {onclick}
   >
     {#if imageFailed}
@@ -130,7 +142,9 @@
         autoplay
         playsinline
         preload="auto"
+        poster={`/api/assets/${asset.id}/thumbnail?size=preview`}
         class="pointer-events-none absolute inset-0 h-full w-full bg-black object-cover"
+        onloadedmetadata={(event) => void event.currentTarget.play().catch(() => undefined)}
         oncanplay={(event) => void event.currentTarget.play().catch(() => undefined)}
         onerror={() => {
           if (videoIndex + 1 < videoSources.length) {

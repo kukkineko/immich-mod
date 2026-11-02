@@ -269,6 +269,23 @@ export class ViewRepository {
     return result.rows;
   }
 
+  /** Every directory below the library root with the number of assets inside it, subfolders included. */
+  async getFolderTree(userId: string, root: string) {
+    const result = await sql<{ path: string; count: number }>`
+      select regexp_replace(substring(a."originalPath" from ${root.length + 2}), '/[^/]*$', '') as path,
+        count(*)::int as count
+      from asset a
+      where a."ownerId" = ${userId}
+        and a.visibility = ${AssetVisibility.Timeline}
+        and a."originalPath" !~* ${rawPattern}
+        and a."deletedAt" is null
+        and a."type" = 'IMAGE'
+        and a."originalPath" like ${escapeLike(root) + '/%/%'}
+      group by 1
+    `.execute(this.db);
+    return result.rows;
+  }
+
   getAssetsByFolderPerson(
     userId: string,
     root: string,

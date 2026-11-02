@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { assetsUrl, defaultQuery, PAGE_SIZE, type FolderAsset, type FolderPerson } from '../folders/folder-types';
+  import { assetsUrl, defaultQuery, PAGE_SIZE, type FolderAsset } from '../folders/folder-types';
   import { thumbnail, toSitePhoto, type SitePhoto } from './site-types';
 
   interface Props {
@@ -11,7 +11,8 @@
 
   let { existing, onadd, onclose }: Props = $props();
 
-  let folders = $state<FolderPerson[]>([]);
+  // every folder at every depth, so a subfolder of a subfolder can be chosen as well
+  let folders = $state<{ path: string; count: number }[]>([]);
   let folder = $state('');
   let assets = $state<FolderAsset[]>([]);
   let page = $state(0);
@@ -24,7 +25,8 @@
   const query = { ...defaultQuery(), sort: 'taken' as const, dir: 'asc' as const };
 
   const fetchPage = async (next: number) => {
-    const response = await fetch(assetsUrl(folder, query, next));
+    // deep: a folder always lists everything below it, whatever the folder's own subfolder mode is
+    const response = await fetch(`${assetsUrl(folder, query, next)}&deep=true`);
     if (!response.ok) {
       throw new Error(String(response.status));
     }
@@ -69,9 +71,9 @@
 
   $effect(() => {
     void (async () => {
-      const response = await fetch('/api/view/folder-people');
+      const response = await fetch('/api/view/folder-people/tree');
       if (response.ok) {
-        folders = (await response.json()) as FolderPerson[];
+        folders = (await response.json()) as { path: string; count: number }[];
       }
     })();
   });
@@ -84,6 +86,29 @@
       delete picked[asset.id];
     } else {
       picked[asset.id] = toSitePhoto(asset);
+    }
+  };
+
+  let selecting = $state(false);
+  // takes every image below the open folder, not only the pages already on screen
+  const selectAll = async () => {
+    selecting = true;
+    try {
+      for (let next = 0; ; next++) {
+        const batch = await fetchPage(next);
+        for (const asset of imagesOf(batch)) {
+          if (!existing.has(asset.id)) {
+            picked[asset.id] = toSitePhoto(asset);
+          }
+        }
+        if (batch.length < PAGE_SIZE) {
+          break;
+        }
+      }
+    } catch {
+      failed = true;
+    } finally {
+      selecting = false;
     }
   };
 
@@ -109,10 +134,16 @@
         onchange={(event) => openFolder(event.currentTarget.value)}
       >
         <option value="">Choose a folder…</option>
-        {#each folders as person (person.key)}
-          <option value={person.key}>{person.name} ({person.assetCount})</option>
+        {#each folders as entry (entry.path)}
+          {@const parts = entry.path.split('/')}
+          <option value={entry.path}>
+            {' '.repeat(parts.length - 1)}{parts.at(-1)} ({entry.count})
+          </option>
         {/each}
       </select>
+      <button type="button" class={buttonClass} disabled={!folder || selecting} onclick={selectAll}>
+        {selecting ? 'Selecting…' : 'Select whole folder'}
+      </button>
       <button type="button" class={buttonClass} onclick={onclose}>Cancel</button>
       <button
         type="button"

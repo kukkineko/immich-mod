@@ -207,18 +207,38 @@ export class ViewService extends BaseService {
     return groupLooseAssets(assets, faces, new Map(names.map((row) => [row.personGroupId, row.name])));
   }
 
+  /** All folders at every depth, each counting the images below it, for picking photos into a curated trip. */
+  async getFolderTree(): Promise<{ path: string; count: number }[]> {
+    const ownerId = (await this.userRepository.getAdmin())?.id;
+    if (!ownerId) {
+      return [];
+    }
+    const totals = new Map<string, number>();
+    for (const { path, count } of await this.viewRepository.getFolderTree(ownerId, await this.getFolderRoot())) {
+      const parts = path.split('/');
+      for (let depth = 1; depth <= parts.length; depth++) {
+        const key = parts.slice(0, depth).join('/');
+        totals.set(key, (totals.get(key) ?? 0) + count);
+      }
+    }
+    return [...totals.entries()]
+      .map(([path, count]) => ({ path, count }))
+      .toSorted((a, b) => a.path.localeCompare(b.path));
+  }
+
   async getAssetsByFolderPerson(
     auth: AuthDto,
     name: string,
     filter: FolderAssetFilter,
     page: number,
     size: number,
+    deep = false,
   ): Promise<AssetResponseDto[]> {
     if (!this.isSafePath(name)) {
       return [];
     }
     const parts = name.split('/');
-    const flattenSubfolders = parts.length > 1 || (await this.isFlattened(parts[0]));
+    const flattenSubfolders = deep || parts.length > 1 || (await this.isFlattened(parts[0]));
     const assets = await this.viewRepository.getAssetsByFolderPerson(
       auth.user.id,
       await this.getFolderRoot(),
