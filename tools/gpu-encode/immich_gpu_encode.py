@@ -18,15 +18,18 @@ import http.client
 import json
 import os
 import shutil
+import socket
 import ssl
 import subprocess
 import sys
 import tempfile
+import threading
+import queue
 import time
 import urllib.parse
 import urllib.request
 
-CHUNK = 1024 * 1024
+CHUNK = 4 * 1024 * 1024
 
 
 def fail(message):
@@ -49,6 +52,16 @@ class Server:
             kwargs["context"] = self.context
         return cls(self.parsed.netloc, **kwargs)
 
+    @staticmethod
+    def _tune(connection):
+        # big socket buffers keep a fast link full
+        connection.connect()
+        for option in (socket.SO_RCVBUF, socket.SO_SNDBUF):
+            try:
+                connection.sock.setsockopt(socket.SOL_SOCKET, option, 8 * 1024 * 1024)
+            except OSError:
+                pass
+
     def _path(self, path):
         return self.parsed.path.rstrip("/") + path
 
@@ -63,6 +76,7 @@ class Server:
 
     def download(self, path, target, total, on_progress):
         connection = self._connection()
+        self._tune(connection)
         connection.request("GET", self._path(path), headers={"x-api-key": self.key})
         response = connection.getresponse()
         if response.status != 200:
@@ -81,6 +95,7 @@ class Server:
     def upload(self, path, source, on_progress):
         size = os.path.getsize(source)
         connection = self._connection(3600)
+        self._tune(connection)
         connection.putrequest("PUT", self._path(path))
         connection.putheader("x-api-key", self.key)
         connection.putheader("Content-Type", "video/mp4")
@@ -168,11 +183,13 @@ def pick_encoder(ffmpeg, wanted, codec):
     fail(f"no working {codec} encoder found (tried: {', '.join(order)})")
 
 
-def encode(ffmpeg, source, target, kind, codec, height, bitrate, duration):
+def encode(ffmpeg, source, target, kind, codec, height, bitrate, hwaccel):
     # never enlarge; even sizes; 8-bit 4:2:0 so every browser can play it
     scale = f"scale=-2:min(ih\\,{height}),format=yuv420p"
-    command = [
-        ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1", "-nostats",
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-nostats"]
+    if hwaccel:
+        command += ["-hwaccel", "auto"]
+    command += [
         "-i", source, "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale,
         "-c:v", ENCODERS[kind][codec], *encoder_options(kind, codec, bitrate),
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
@@ -180,20 +197,185 @@ def encode(ffmpeg, source, target, kind, codec, height, bitrate, duration):
     if codec == "hevc":
         command += ["-tag:v", "hvc1"]
     command.append(target)
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    started = time.time()
-    for line in process.stdout:
-        if line.startswith("out_time_us=") and duration:
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[-400:])
+
+
+class Stats:
+    """Counters shared by all workers; the status line reads them once a second."""
+
+    def __init__(self, total):
+        self.lock = threading.Lock()
+        self.total = total
+        self.down_bytes = 0
+        self.up_bytes = 0
+        self.active = {"down": 0, "enc": 0, "up": 0}
+        self.done = 0
+        self.failed = 0
+        self.saved = 0
+        self.finished = threading.Event()
+
+    def add(self, field, amount):
+        with self.lock:
+            setattr(self, field, getattr(self, field) + amount)
+
+    def move(self, stage, delta):
+        with self.lock:
+            self.active[stage] += delta
+
+    def finish(self, ok):
+        with self.lock:
+            if ok:
+                self.done += 1
+            else:
+                self.failed += 1
+            if self.done + self.failed >= self.total:
+                self.finished.set()
+
+
+def log(message):
+    sys.stdout.write("\r" + " " * 110 + "\r" + message + "\n")
+    sys.stdout.flush()
+
+
+def status_loop(stats):
+    last = (time.time(), 0, 0)
+    while not stats.finished.wait(1.0):
+        now = time.time()
+        with stats.lock:
+            down, up = stats.down_bytes, stats.up_bytes
+            active = dict(stats.active)
+            done, failed = stats.done, stats.failed
+        span = max(now - last[0], 0.001)
+        down_rate = (down - last[1]) / span
+        up_rate = (up - last[2]) / span
+        last = (now, down, up)
+        sys.stdout.write(
+            f"\r  down {down_rate * 8 / 1e6:6.0f} Mbit/s ({active['down']})  "
+            f"encode ({active['enc']})  up {up_rate * 8 / 1e6:6.0f} Mbit/s ({active['up']})  "
+            f"| {done}/{stats.total} done, {failed} failed   "
+        )
+        sys.stdout.flush()
+
+
+def fetch_queue(server, limit):
+    """The whole list, in pages, because the server caps one answer."""
+    items, seen = [], []
+    while True:
+        skip = urllib.parse.quote(",".join(seen))
+        page = server.get_json(f"/api/view/encode-queue?limit=500&skip={skip}")
+        if not page:
+            break
+        items.extend(page)
+        seen.extend(item["id"] for item in page)
+        if limit and len(items) >= limit:
+            break
+    return items[:limit] if limit else items
+
+
+def run_pipeline(args, server, queue_items, kind, work):
+    """Downloads, encodes and uploads at the same time: each stage has its own workers and the stages are chained."""
+    stats = Stats(len(queue_items))
+    to_download, to_encode, to_upload = queue.Queue(), queue.Queue(), queue.Queue()
+    # how many videos may sit on disk at once (downloaded, encoding, or waiting to upload)
+    slots = threading.Semaphore(args.inflight)
+
+    def cleanup(*paths):
+        for path in paths:
             try:
-                seconds = int(line.split("=")[1]) / 1_000_000
-            except ValueError:
-                continue
-            speed = seconds / max(time.time() - started, 0.001)
-            sys.stdout.write(f"\r  encoding {min(100, int(seconds * 100 / duration))}%  ({speed:.1f}x)   ")
-            sys.stdout.flush()
-    process.wait()
-    if process.returncode != 0:
-        raise RuntimeError(process.stderr.read()[-400:])
+                os.remove(path)
+            except OSError:
+                pass
+
+    def downloader():
+        while True:
+            item = to_download.get()
+            slots.acquire()
+            name = item["originalFileName"]
+            source = os.path.join(work, f"{item['id']}.src")
+            stats.move("down", 1)
+            last = [0]
+
+            def progress(done, total):
+                stats.add("down_bytes", done - last[0])
+                last[0] = done
+
+            try:
+                server.download(f"/api/assets/{item['id']}/original", source, item.get("size"), progress)
+                to_encode.put((item, source))
+            except Exception as error:
+                log(f"  {name}: download failed: {error}")
+                cleanup(source)
+                slots.release()
+                stats.finish(False)
+            finally:
+                stats.move("down", -1)
+
+    def encoder():
+        while True:
+            item, source = to_encode.get()
+            name = item["originalFileName"]
+            target = os.path.join(work, f"{item['id']}.mp4")
+            stats.move("enc", 1)
+            try:
+                try:
+                    encode(args.ffmpeg, source, target, kind, args.codec, args.height, args.bitrate, True)
+                except RuntimeError:
+                    # some sources do not like hardware decoding; decode in software then
+                    encode(args.ffmpeg, source, target, kind, args.codec, args.height, args.bitrate, False)
+                to_upload.put((item, target))
+            except Exception as error:
+                log(f"  {name}: encoding failed: {error}")
+                cleanup(target)
+                slots.release()
+                stats.finish(False)
+            finally:
+                cleanup(source)
+                stats.move("enc", -1)
+
+    def uploader():
+        while True:
+            item, target = to_upload.get()
+            name = item["originalFileName"]
+            stats.move("up", 1)
+            last = [0]
+
+            def progress(done, total):
+                stats.add("up_bytes", done - last[0])
+                last[0] = done
+
+            try:
+                server.upload(f"/api/view/encoded/{item['id']}", target, progress)
+                new_size = os.path.getsize(target)
+                stats.add("saved", (item.get("size") or 0) - new_size)
+                log(f"  {name}: stored ({human(new_size)}, was {human(item.get('size'))})")
+                stats.finish(True)
+            except Exception as error:
+                log(f"  {name}: upload failed: {error}")
+                stats.finish(False)
+            finally:
+                cleanup(target)
+                slots.release()
+                stats.move("up", -1)
+
+    for count, function in ((args.downloads, downloader), (args.encoders, encoder), (args.uploads, uploader)):
+        for _ in range(count):
+            threading.Thread(target=function, daemon=True).start()
+    threading.Thread(target=status_loop, args=(stats,), daemon=True).start()
+
+    # biggest first: the long jobs start early and the run ends with small ones, so no worker idles at the end
+    for item in sorted(queue_items, key=lambda entry: entry.get("size") or 0, reverse=True):
+        to_download.put(item)
+    started = time.time()
+    while not stats.finished.wait(0.5):
+        pass
+    minutes = (time.time() - started) / 60
+    sys.stdout.write("\r" + " " * 110 + "\r")
+    print(
+        f"Done in {minutes:.1f} min: {stats.done} stored, {stats.failed} failed, "
+        f"{human(stats.down_bytes)} downloaded, {human(stats.up_bytes)} uploaded, {human(max(stats.saved, 0))} saved."
+    )
 
 
 def main():
@@ -201,11 +383,15 @@ def main():
     parser.add_argument("--server", default=os.environ.get("IMMICH_URL"), help="e.g. http://truenas.local:30041")
     parser.add_argument("--key", default=os.environ.get("IMMICH_API_KEY"), help="Immich API key")
     parser.add_argument("--limit", type=int, default=0, help="stop after this many videos (default: all)")
-    parser.add_argument("--height", type=int, default=1080, help="longest side limit is the height; default 1080")
+    parser.add_argument("--height", type=int, default=1080, help="height limit; default 1080")
     parser.add_argument("--bitrate", default="8M", help="maximum bitrate, e.g. 4M or 8000k (default 8M)")
     parser.add_argument("--codec", choices=["h264", "hevc", "av1"], default="h264", help="h264 plays everywhere")
     parser.add_argument("--encoder", choices=["auto", "nvenc", "qsv", "amf", "cpu"], default="auto")
-    parser.add_argument("--workdir", default=None, help="folder for temporary files (needs room for one video twice)")
+    parser.add_argument("--downloads", type=int, default=4, help="parallel downloads (default 4)")
+    parser.add_argument("--encoders", type=int, default=0, help="parallel encodes (default: 3 on a GPU, 1 on the CPU)")
+    parser.add_argument("--uploads", type=int, default=3, help="parallel uploads (default 3)")
+    parser.add_argument("--inflight", type=int, default=0, help="videos on disk at once (default: encoders + 4)")
+    parser.add_argument("--workdir", default=None, help="folder for temporary files, fastest disk you have")
     parser.add_argument("--ffmpeg", default=shutil.which("ffmpeg") or "ffmpeg")
     parser.add_argument("--insecure", action="store_true", help="accept a self-signed https certificate")
     parser.add_argument("--yes", action="store_true", help="do not ask before starting")
@@ -220,53 +406,36 @@ def main():
         fail("--bitrate needs a unit, like 4M or 8000k")
 
     server = Server(args.server, args.key, args.insecure)
-    queue = server.get_json("/api/view/encode-queue?limit=500")
-    if args.limit:
-        queue = queue[: args.limit]
-    if not queue:
+    queue_items = fetch_queue(server, args.limit)
+    if not queue_items:
         print("Every video already has an encoded copy.")
         return
-    total_size = sum(item.get("size") or 0 for item in queue)
-    print(f"{len(queue)} video(s) without an encoded copy, {human(total_size)} of originals.")
+    total_size = sum(item.get("size") or 0 for item in queue_items)
+    print(f"{len(queue_items)} video(s) without an encoded copy, {human(total_size)} of originals.")
     if args.dry_run:
-        for item in queue:
+        for item in queue_items:
             print(f"  {item['originalFileName']}  {human(item.get('size'))}  {item.get('width')}x{item.get('height')}")
         return
 
     kind = pick_encoder(args.ffmpeg, args.encoder, args.codec)
-    print(f"Encoder: {ENCODERS[kind][args.codec]}  |  up to {args.height}p, {args.bitrate} max, {args.codec}")
+    if not args.encoders:
+        args.encoders = 1 if kind == "cpu" else 3
+    if not args.inflight:
+        args.inflight = args.encoders + 4
+    print(
+        f"Encoder: {ENCODERS[kind][args.codec]}  |  up to {args.height}p, {args.bitrate} max, {args.codec}\n"
+        f"Parallel: {args.downloads} downloads, {args.encoders} encodes, {args.uploads} uploads, "
+        f"up to {args.inflight} videos on disk"
+    )
     if not args.yes and input("Start? [y/N] ").strip().lower() not in ("y", "yes"):
         print("Cancelled.")
         return
 
     work = tempfile.mkdtemp(prefix="immich-encode-", dir=args.workdir)
-    done = failed = 0
     try:
-        for number, item in enumerate(queue, 1):
-            name = item["originalFileName"]
-            print(f"[{number}/{len(queue)}] {name}")
-            source = os.path.join(work, "source" + os.path.splitext(name)[1])
-            target = os.path.join(work, "encoded.mp4")
-            try:
-                server.download(f"/api/assets/{item['id']}/original", source, item.get("size"),
-                                lambda d, t: progress_line("downloading", d, t))
-                print()
-                encode(args.ffmpeg, source, target, kind, args.codec, args.height, args.bitrate,
-                       (item.get("duration") or 0) / 1000)
-                print()
-                server.upload(f"/api/view/encoded/{item['id']}", target, lambda d, t: progress_line("uploading", d, t))
-                print(f"\n  stored ({human(os.path.getsize(target))}, was {human(item.get('size'))})")
-                done += 1
-            except Exception as error:  # one bad video must not stop the rest
-                print(f"\n  failed: {error}")
-                failed += 1
-            finally:
-                for path in (source, target):
-                    if os.path.exists(path):
-                        os.remove(path)
+        run_pipeline(args, server, queue_items, kind, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    print(f"Done: {done} stored, {failed} failed.")
 
 
 if __name__ == "__main__":
@@ -274,3 +443,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\nStopped.")
+        os._exit(130)
