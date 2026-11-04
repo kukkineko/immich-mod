@@ -183,6 +183,14 @@ export class MediaRepository {
       .toFile(output);
   }
 
+  /** A smaller WebP copy of an already rotated preview, for pages that only need a medium size. */
+  async resizeToFile(input: string, width: number, output: string): Promise<void> {
+    await sharp(input, { failOn: 'none' })
+      .resize({ width, withoutEnlargement: true })
+      .webp({ quality: 72, effort: 4 })
+      .toFile(output);
+  }
+
   private getImageDecodingPipeline(input: string | Buffer, options: DecodeToBufferOptions) {
     let pipeline = sharp(input, {
       // some invalid images can still be processed by sharp, but we want to fail on them by default to avoid crashes

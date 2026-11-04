@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { progressive } from '$lib/utils/progressive-image';
-  import { aspectRatio, formatDuration, pictureSources, type FolderAsset } from './folder-types';
+  import { ladder, progressive, type Step } from '$lib/utils/progressive-image';
+  import { aspectRatio, assetPicture, formatDuration, type FolderAsset } from './folder-types';
   import { attachStream, playbackUrl, type VideoStream } from './video-stream';
 
   interface Props {
@@ -14,8 +14,15 @@
   let previewing = $state(false);
   let previewFailed = $state(false);
   let sourceIndex = $state(0);
-  const sources = $derived(pictureSources(asset.id, asset.type === 'IMAGE'));
-  const imageFailed = $derived(sourceIndex >= sources.length);
+  // the small sizes first; when the thumbnail is missing, only the preview is left to try
+  const steps = $derived<Step[]>(
+    sourceIndex === 0
+      ? ladder((size) => assetPicture(asset.id, size))
+      : sourceIndex === 1
+        ? [{ url: assetPicture(asset.id, 'preview'), width: 1440 }]
+        : [],
+  );
+  const imageFailed = $derived(sourceIndex >= 2);
   let holdTimer: ReturnType<typeof setTimeout> | undefined;
   let touchPreviewed = false;
 
@@ -157,11 +164,7 @@
     {:else}
       <!-- videos keep their whole frame (portrait clips would be cropped to a square otherwise) -->
       <img
-        use:progressive={{
-          low: sources[sourceIndex],
-          high: `/api/assets/${asset.id}/thumbnail?size=preview`,
-          onfail: () => sourceIndex++,
-        }}
+        use:progressive={{ steps, onfail: () => sourceIndex++ }}
         alt={asset.originalFileName}
         draggable="false"
         class="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"

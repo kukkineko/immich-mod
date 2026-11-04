@@ -150,6 +150,24 @@ export class ViewController {
     await sendFile(res, next, () => this.service.getPublicFile(id, size), this.logger);
   }
 
+  @Get('resized/:id/:size')
+  @FileResponse()
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Retrieve a medium-sized photo',
+    description: 'A 640 or 1280 pixel wide WebP copy of a photo, made on first request and cached.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  async getResizedFile(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('size') size: string,
+    @Res() res: Response,
+    @Next() next: NextFunction,
+  ) {
+    await sendFile(res, next, () => this.service.getResizedFileFor(auth, id, size), this.logger);
+  }
+
   @Get('site/curated')
   @Authenticated({ permission: Permission.FolderRead })
   @Endpoint({

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { appSettings } from '$lib/stores/app-settings.svelte';
+  import { ladder, progressive } from '$lib/utils/progressive-image';
   import SiteHeader from './SiteHeader.svelte';
   import { publicFile } from './travel-types';
   import type { PageData } from './$types';
@@ -22,7 +23,7 @@
     <SiteHeader />
     {#if hero?.assetId}
       <img
-        src={publicFile(hero.assetId, 'preview')}
+        use:progressive={{ steps: ladder((size) => publicFile(hero.assetId!, size)) }}
         alt=""
         class="absolute inset-0 h-full w-full scale-105 object-cover"
       />

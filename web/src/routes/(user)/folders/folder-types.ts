@@ -143,13 +143,17 @@ export const favouritesFirst = <T extends { isFavorite: boolean }>(list: T[]) =>
 
 /**
  * where to look for a picture of an asset, smallest file first to save bandwidth: tiles and portraits start with the
- * small thumbnail, the viewer starts with the big preview; the other size and (images only) the file itself are fallbacks
+ * small thumbnail, the viewer starts with the big preview; the other size is the fallback. The camera original is never
+ * a source: it can be many megabytes.
  */
-export const pictureSources = (id: string, isImage = true, first: 'thumbnail' | 'preview' = 'thumbnail') => [
+export const pictureSources = (id: string, _isImage = true, first: 'thumbnail' | 'preview' = 'thumbnail') => [
   `/api/assets/${id}/thumbnail?size=${first}`,
   `/api/assets/${id}/thumbnail?size=${first === 'thumbnail' ? 'preview' : 'thumbnail'}`,
-  ...(isImage ? [`/api/assets/${id}/original`] : []),
 ];
+
+/** one size of a picture of an asset; the medium sizes are resized by the server and cached */
+export const assetPicture = (id: string, size: 'thumbnail' | 'w640' | 'w1280' | 'preview') =>
+  size === 'w640' || size === 'w1280' ? `/api/view/resized/${id}/${size}` : `/api/assets/${id}/thumbnail?size=${size}`;
 
 export const formatBytes = (bytes?: number | null) => {
   if (!bytes) {

@@ -38,7 +38,7 @@ export type PublicTripPage = {
   blocks: PublicBlock[];
 };
 
-export const publicFile = (id: string, size: 'thumbnail' | 'preview') =>
+export const publicFile = (id: string, size: 'thumbnail' | 'w640' | 'w1280' | 'preview') =>
   `/api/view/public/file/${id}/${size}`;
 
 export const photoRatio = (photo: PublicPhoto) =>

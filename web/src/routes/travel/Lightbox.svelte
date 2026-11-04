@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { progressive } from '$lib/utils/progressive-image';
+  import { ladder, progressive } from '$lib/utils/progressive-image';
   import { formatDay, publicFile, type PublicPhoto } from './travel-types';
 
   interface Props {
@@ -53,11 +53,7 @@
       {#key photo.id}
         <!-- only downsized pictures are ever sent; the camera originals are far too large for the web -->
         <!-- the grid already fetched the small one, so it shows at once and the sharp one replaces it -->
-        <img
-          use:progressive={{ low: publicFile(photo.id, 'thumbnail'), high: publicFile(photo.id, 'preview') }}
-          alt={photo.name}
-          class={fit}
-        />
+        <img use:progressive={{ steps: ladder((size) => publicFile(photo.id, size)) }} alt={photo.name} class={fit} />
       {/key}
 
       {#if index > 0}

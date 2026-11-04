@@ -1,6 +1,6 @@
 <script lang="ts">
   import { appSettings } from '$lib/stores/app-settings.svelte';
-  import { progressive } from '$lib/utils/progressive-image';
+  import { ladder, progressive } from '$lib/utils/progressive-image';
   import Lightbox from '../Lightbox.svelte';
   import SiteHeader from '../SiteHeader.svelte';
   import { buildSections, formatDay, photoRatio, publicFile, type PublicPhoto } from '../travel-types';
@@ -46,7 +46,11 @@
   <section class="relative flex h-[65vh] min-h-[22rem] items-end overflow-hidden">
     <SiteHeader back />
     {#if heroId}
-      <img src={publicFile(heroId, 'preview')} alt="" class="absolute inset-0 h-full w-full object-cover" />
+      <img
+        use:progressive={{ steps: ladder((size) => publicFile(heroId, size)) }}
+        alt=""
+        class="absolute inset-0 h-full w-full object-cover"
+      />
     {/if}
     <div class="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/20 to-black/40"></div>
     <div class="relative z-10 w-full px-5 pb-10 sm:px-10">
@@ -94,10 +98,7 @@
             <figure class="mx-auto py-3 {section.size === 'wide' ? 'max-w-6xl' : 'max-w-none'}">
               <button type="button" class="block w-full" onclick={() => open(section.photo.id)}>
                 <img
-                  use:progressive={{
-                    low: publicFile(section.photo.id, 'thumbnail'),
-                    high: publicFile(section.photo.id, 'preview'),
-                  }}
+                  use:progressive={{ steps: ladder((size) => publicFile(section.photo.id, size)) }}
                   alt={section.photo.name}
                   class="w-full rounded-xl object-cover {section.size === 'full' ? 'max-h-[90vh]' : 'max-h-[80vh]'}"
                 />
@@ -122,10 +123,7 @@
                     onclick={() => open(item.photo.id)}
                   >
                     <img
-                      use:progressive={{
-                        low: publicFile(item.photo.id, 'thumbnail'),
-                        high: publicFile(item.photo.id, 'preview'),
-                      }}
+                      use:progressive={{ steps: ladder((size) => publicFile(item.photo.id, size)) }}
                       alt={item.photo.name}
                       class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                     />

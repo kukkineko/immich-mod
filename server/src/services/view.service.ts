@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import { dirname, join } from 'node:path';
 import { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto, FolderCoverDto, FolderModeDto, FolderPublicDto } from 'src/dtos/folder-app-settings.dto';
@@ -19,7 +20,8 @@ import {
   SiteTripSummaryDto,
 } from 'src/dtos/public-site.dto';
 import { OnEvent } from 'src/decorators';
-import { CacheControl, ImmichWorker, JobName, SystemMetadataKey } from 'src/enum';
+import { CacheControl, ImmichWorker, JobName, Permission, SystemMetadataKey } from 'src/enum';
+import { StorageCore } from 'src/cores/storage.core';
 import { ViewRepository } from 'src/repositories/view-repository';
 import { BaseService } from 'src/services/base.service';
 import { PublicSiteTrip } from 'src/types';
@@ -34,6 +36,9 @@ import {
   isPhotoVisible,
   resolveBlocks,
 } from 'src/utils/public-site';
+
+/** Medium sizes between the thumbnail and the preview; they save bandwidth on small screens and slow links. */
+const RESIZE_WIDTHS: Record<string, number> = { w640: 640, w1280: 1280 };
 
 /** Top-level folders below this path are treated as people. Set IMMICH_FOLDER_ROOT to change it. */
 const contentRoot = () => (process.env.IMMICH_FOLDER_ROOT || '/media').replaceAll(/\/+$/g, '');
@@ -516,6 +521,9 @@ export class ViewService extends BaseService {
       throw new NotFoundException();
     }
 
+    if (size in RESIZE_WIDTHS) {
+      return this.getResizedFile(id, size);
+    }
     // the public side never serves the camera original, whatever size was asked for
     const type = size === 'thumbnail' ? 'thumbnail' : 'preview';
     const { path } = await this.assetRepository.getForThumbnail(id, type as never, false);
@@ -527,6 +535,41 @@ export class ViewService extends BaseService {
       contentType: mimeTypes.lookup(path),
       cacheControl: CacheControl.PrivateWithCache,
     });
+  }
+
+  private resizing = new Map<string, Promise<void>>();
+
+  /** The resized copy is made once from the preview, kept on disk and served with long caching. */
+  async getResizedFile(id: string, size: string): Promise<ImmichFileResponse> {
+    const width = RESIZE_WIDTHS[size];
+    const { path: source } = await this.assetRepository.getForThumbnail(id, 'preview' as never, false);
+    if (!width || !source) {
+      throw new NotFoundException();
+    }
+    const output = join(StorageCore.getMediaLocation(), 'resized', id.slice(0, 2), `${id}-${width}.webp`);
+    if (!(await this.storageRepository.checkFileExists(output))) {
+      let job = this.resizing.get(output);
+      if (!job) {
+        const temporary = `${output}.${randomBytes(4).toString('hex')}.tmp`;
+        this.storageRepository.mkdirSync(dirname(output));
+        job = this.mediaRepository
+          .resizeToFile(source, width, temporary)
+          .then(() => this.storageRepository.rename(temporary, output))
+          .finally(() => this.resizing.delete(output));
+        this.resizing.set(output, job);
+      }
+      await job;
+    }
+    return new ImmichFileResponse({
+      path: output,
+      contentType: 'image/webp',
+      cacheControl: CacheControl.PrivateWithCache,
+    });
+  }
+
+  async getResizedFileFor(auth: AuthDto, id: string, size: string): Promise<ImmichFileResponse> {
+    await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
+    return this.getResizedFile(id, size);
   }
 
   private requireEditableTrip(site: Record<string, PublicSiteTrip>, name: string) {

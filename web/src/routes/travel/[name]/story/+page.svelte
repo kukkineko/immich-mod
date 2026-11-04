@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ladder, progressive } from '$lib/utils/progressive-image';
   import { appSettings } from '$lib/stores/app-settings.svelte';
   import SiteHeader from '../../SiteHeader.svelte';
   import { renderStory } from '../../story-markdown';
@@ -22,7 +23,11 @@
   <section class="relative flex h-[50vh] min-h-[18rem] items-end overflow-hidden">
     <SiteHeader back />
     {#if trip?.assetId}
-      <img src={publicFile(trip.assetId, 'preview')} alt="" class="absolute inset-0 h-full w-full object-cover" />
+      <img
+        use:progressive={{ steps: ladder((size) => publicFile(trip.assetId!, size)) }}
+        alt=""
+        class="absolute inset-0 h-full w-full object-cover"
+      />
     {/if}
     <div class="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/30 to-black/40"></div>
     <div class="relative z-10 w-full px-5 pb-10 sm:px-10">
