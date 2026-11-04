@@ -260,18 +260,11 @@ def status_loop(stats):
 
 
 def fetch_queue(server, limit):
-    """The whole list, in pages, because the server caps one answer."""
-    items, seen = [], []
-    while True:
-        skip = urllib.parse.quote(",".join(seen))
-        page = server.get_json(f"/api/view/encode-queue?limit=500&skip={skip}")
-        if not page:
-            break
-        items.extend(page)
-        seen.extend(item["id"] for item in page)
-        if limit and len(items) >= limit:
-            break
-    return items[:limit] if limit else items
+    """The whole list in one request (the server allows up to 20000), so no long skip lists go into a URL."""
+    items = server.get_json(f"/api/view/encode-queue?limit={limit or 20000}")
+    if not limit and len(items) >= 20000:
+        print("More than 20000 videos are waiting; run the tool again after this batch.")
+    return items
 
 
 def run_pipeline(args, server, queue_items, kind, work):

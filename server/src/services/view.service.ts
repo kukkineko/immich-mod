@@ -541,7 +541,7 @@ export class ViewService extends BaseService {
 
   /** Videos still waiting for an encoded copy; an outside encoder (a PC with a GPU) works through this list. */
   async getEncodeQueue(auth: AuthDto, limit: number, skip: string[]) {
-    return this.viewRepository.getVideosWithoutEncoded(auth.user.id, Math.min(500, Math.max(1, limit)), skip);
+    return this.viewRepository.getVideosWithoutEncoded(auth.user.id, Math.min(20_000, Math.max(1, limit)), skip);
   }
 
   /**
