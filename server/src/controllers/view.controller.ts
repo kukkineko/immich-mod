@@ -10,15 +10,22 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { NextFunction, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto, FolderCoverDto, FolderModeDto, FolderPublicDto } from 'src/dtos/folder-app-settings.dto';
-import { FolderPersonDto, FolderTreeEntryDto, FolderSubfoldersDto, LooseGroupDto, PublicTripDto } from 'src/dtos/folder-person.dto';
+import {
+  FolderPersonDto,
+  FolderSubfoldersDto,
+  FolderTreeEntryDto,
+  LooseGroupDto,
+  PublicTripDto,
+} from 'src/dtos/folder-person.dto';
 import {
   PublicTripPageDto,
   SiteCuratedCreateDto,
@@ -166,6 +173,33 @@ export class ViewController {
     @Next() next: NextFunction,
   ) {
     await sendFile(res, next, () => this.service.getResizedFileFor(auth, id, size), this.logger);
+  }
+
+  @Get('encode-queue')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'List videos without an encoded copy',
+    description: 'For an outside encoder: videos that still need an encoded copy, oldest first.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getEncodeQueue(@Auth() auth: AuthDto, @Query() query: Record<string, string | undefined>) {
+    return this.service.getEncodeQueue(
+      auth,
+      Number.parseInt(query.limit ?? '50', 10) || 50,
+      (query.skip ?? '').split(',').filter(Boolean),
+    );
+  }
+
+  @Put('encoded/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Upload an encoded copy of a video',
+    description: 'The request body is the encoded MP4. It is checked and stored like the own encoding of the server.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  saveEncodedVideo(@Auth() auth: AuthDto, @Param('id') id: string, @Req() request: Request): Promise<void> {
+    return this.service.saveEncodedVideo(auth, id, request);
   }
 
   @Get('site/curated')

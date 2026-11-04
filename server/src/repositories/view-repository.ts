@@ -269,6 +269,40 @@ export class ViewRepository {
     return result.rows;
   }
 
+  /** Videos that have no stored encoded copy yet, oldest first, for an outside encoder to work through. */
+  getVideosWithoutEncoded(userId: string, limit: number, skip: string[]) {
+    return this.db
+      .selectFrom('asset')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select([
+        'asset.id',
+        'asset.originalFileName',
+        'asset.duration',
+        'asset_exif.exifImageWidth as width',
+        'asset_exif.exifImageHeight as height',
+        'asset_exif.fileSizeInByte as size',
+      ])
+      .where('asset.ownerId', '=', asUuid(userId))
+      .where('asset.type', '=', AssetType.Video)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.not(
+          eb.exists(
+            eb
+              .selectFrom('asset_file')
+              .select('asset_file.id')
+              .whereRef('asset_file.assetId', '=', 'asset.id')
+              .where('asset_file.type', '=', AssetFileType.EncodedVideo),
+          ),
+        ),
+      )
+      .$if(skip.length > 0, (qb) => qb.where('asset.id', 'not in', skip))
+      .orderBy('asset.fileCreatedAt', 'asc')
+      .limit(limit)
+      .execute();
+  }
+
   /** Which of these videos already have a stored encoded copy. */
   async getEncodedVideoIds(ids: string[]) {
     if (ids.length === 0) {

@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { StorageCore } from 'src/cores/storage.core';
+import { OnEvent } from 'src/decorators';
 import { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FolderAppSettingsDto, FolderCoverDto, FolderModeDto, FolderPublicDto } from 'src/dtos/folder-app-settings.dto';
@@ -19,9 +23,7 @@ import {
   SiteTripSaveDto,
   SiteTripSummaryDto,
 } from 'src/dtos/public-site.dto';
-import { OnEvent } from 'src/decorators';
-import { CacheControl, ImmichWorker, JobName, Permission, SystemMetadataKey } from 'src/enum';
-import { StorageCore } from 'src/cores/storage.core';
+import { AssetFileType, AssetType, CacheControl, ImmichWorker, JobName, Permission, SystemMetadataKey } from 'src/enum';
 import { ViewRepository } from 'src/repositories/view-repository';
 import { BaseService } from 'src/services/base.service';
 import { PublicSiteTrip } from 'src/types';
@@ -535,6 +537,49 @@ export class ViewService extends BaseService {
       contentType: mimeTypes.lookup(path),
       cacheControl: CacheControl.PrivateWithCache,
     });
+  }
+
+  /** Videos still waiting for an encoded copy; an outside encoder (a PC with a GPU) works through this list. */
+  async getEncodeQueue(auth: AuthDto, limit: number, skip: string[]) {
+    return this.viewRepository.getVideosWithoutEncoded(auth.user.id, Math.min(500, Math.max(1, limit)), skip);
+  }
+
+  /**
+   * Takes an encoded copy made elsewhere and stores it exactly as the server's own encoder would have, so playback
+   * and the "stored copy" badge treat it the same.
+   */
+  async saveEncodedVideo(auth: AuthDto, id: string, body: Readable): Promise<void> {
+    await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
+    const asset = await this.assetRepository.getById(id);
+    if (!asset || asset.type !== AssetType.Video) {
+      throw new NotFoundException('Asset not found or not a video');
+    }
+    const output = StorageCore.getEncodedVideoPath(asset);
+    const temporary = `${output}.${randomBytes(4).toString('hex')}.upload`;
+    this.storageCore.ensureFolders(output);
+    try {
+      await pipeline(body, this.storageRepository.createWriteStream(temporary));
+      // never keep something that is not a playable video
+      const info = await this.mediaRepository.probe(temporary);
+      const expected = asset.duration ? asset.duration / 1000 : undefined;
+      if (
+        info.videoStreams.length === 0 ||
+        (expected && Math.abs(info.format.duration - expected) > Math.max(2, expected * 0.05))
+      ) {
+        throw new BadRequestException('The uploaded file is not a complete video of this asset');
+      }
+      await this.storageRepository.rename(temporary, output);
+    } catch (error) {
+      await this.storageRepository.unlink(temporary).catch(() => undefined);
+      throw error;
+    }
+    await this.assetRepository.upsertFile({
+      assetId: id,
+      type: AssetFileType.EncodedVideo,
+      path: output,
+      isEdited: false,
+    });
+    this.logger.log(`Stored encoded video for asset ${id} (uploaded)`);
   }
 
   private resizing = new Map<string, Promise<void>>();
