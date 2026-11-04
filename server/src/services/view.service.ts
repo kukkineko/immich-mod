@@ -19,7 +19,7 @@ import {
   SiteTripSummaryDto,
 } from 'src/dtos/public-site.dto';
 import { OnEvent } from 'src/decorators';
-import { CacheControl, ImmichWorker, SystemMetadataKey } from 'src/enum';
+import { CacheControl, ImmichWorker, JobName, SystemMetadataKey } from 'src/enum';
 import { ViewRepository } from 'src/repositories/view-repository';
 import { BaseService } from 'src/services/base.service';
 import { PublicSiteTrip } from 'src/types';
@@ -273,7 +273,39 @@ export class ViewService extends BaseService {
       size,
       page * size,
     );
-    return assets.map((asset) => mapAsset(asset, { auth }));
+    this.repairVideos(assets);
+    const encoded = await this.viewRepository.getEncodedVideoIds(
+      assets.filter((asset) => asset.type === 'VIDEO').map((asset) => asset.id),
+    );
+    // the extra flag lets the page prefer the stored encoded copy and mark it
+    return assets.map((asset) => ({ ...mapAsset(asset, { auth }), encodedVideo: encoded.has(asset.id) }));
+  }
+
+  private repaired = new Set<string>();
+
+  /**
+   * A video without a duration never went through metadata extraction, and then it has no thumbnail either.
+   * Queue both once per start, so the tiles fill in by themselves instead of staying blank.
+   */
+  private repairVideos(assets: { id: string; type: string; duration: number | null }[]) {
+    const broken = assets.filter(
+      (asset) => asset.type === 'VIDEO' && asset.duration === null && !this.repaired.has(asset.id),
+    );
+    if (broken.length === 0) {
+      return;
+    }
+    for (const asset of broken) {
+      this.repaired.add(asset.id);
+    }
+    this.logger.log(`Queueing metadata and thumbnails for ${broken.length} video(s) without a duration`);
+    void this.jobRepository
+      .queueAll(
+        broken.flatMap((asset) => [
+          { name: JobName.AssetExtractMetadata, data: { id: asset.id } } as const,
+          { name: JobName.AssetGenerateThumbnails, data: { id: asset.id } } as const,
+        ]),
+      )
+      .catch((error) => this.logger.warn(`Could not queue video repair: ${error}`));
   }
 
   /** The public side only exists in travel mode and only ever shows what was marked public. */

@@ -1,13 +1,24 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { AUTO, attachStream, playbackUrl, saveQuality, savedQuality, type Quality, type VideoStream } from './video-stream';
+  import {
+    AUTO,
+    STORED,
+    attachStream,
+    playbackUrl,
+    saveQuality,
+    savedQuality,
+    type Quality,
+    type VideoStream,
+  } from './video-stream';
 
   interface Props {
     assetId: string;
     name: string;
+    /** a stored encoded copy exists and is played in preference to live encoding */
+    encoded: boolean;
   }
 
-  let { assetId, name }: Props = $props();
+  let { assetId, name, encoded }: Props = $props();
 
   let failed = $state(false);
   let buffering = $state(true);
@@ -31,6 +42,10 @@
     qualities = [];
     failed = false;
     buffering = true;
+    if (encoded && quality === STORED) {
+      fallback = true;
+      return;
+    }
     const video = element;
     const attached = await attachStream(video, assetId, {
       onQualities: (list) => (qualities = list),
@@ -52,9 +67,19 @@
   });
 
   const choose = (key: string) => {
+    const wasStored = fallback && !stream;
     quality = key;
     saveQuality(key);
-    stream?.setQuality(key);
+    if (key === STORED) {
+      stopStream();
+      qualities = [];
+      fallback = true;
+    } else if (wasStored) {
+      fallback = false;
+      void connect();
+    } else {
+      stream?.setQuality(key);
+    }
   };
 
   const onerror = () => {
@@ -80,7 +105,9 @@
 <!-- full-size box so the video can be limited to the screen; only the media itself takes clicks, the rest closes the viewer -->
 <div class="pointer-events-none relative flex h-full w-full items-center justify-center">
   {#if failed}
-    <div class="pointer-events-auto flex flex-col items-center gap-3 rounded-2xl bg-neutral-900 p-8 text-center text-white">
+    <div
+      class="pointer-events-auto flex flex-col items-center gap-3 rounded-2xl bg-neutral-900 p-8 text-center text-white"
+    >
       <p class="font-semibold">This video can't be played in the browser.</p>
       <p class="text-sm text-neutral-400">{name}</p>
       <div class="flex gap-2">
@@ -125,17 +152,22 @@
         <div class="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
       </div>
     {/if}
-    {#if qualities.length > 1}
-      <label class="pointer-events-auto absolute top-3 left-3 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur">
+    {#if encoded || qualities.length > 1}
+      <label
+        class="pointer-events-auto absolute top-3 left-3 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur"
+      >
         Quality
         <select
           class="bg-transparent text-white outline-none"
-          value={quality}
+          value={encoded && quality === STORED ? STORED : quality === STORED ? AUTO : quality}
           onchange={(event) => choose(event.currentTarget.value)}
         >
-          <option value={AUTO} class="text-black">Auto</option>
+          {#if encoded}
+            <option value={STORED} class="text-black">Stored copy</option>
+          {/if}
+          <option value={AUTO} class="text-black">Live · Auto</option>
           {#each qualities as option (option.key)}
-            <option value={option.key} class="text-black">{option.label}</option>
+            <option value={option.key} class="text-black">Live · {option.label}</option>
           {/each}
         </select>
       </label>

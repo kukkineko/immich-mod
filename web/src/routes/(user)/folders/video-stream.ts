@@ -12,6 +12,8 @@ export type Quality = {
 };
 
 export const AUTO = 'auto';
+/** the stored encoded copy, played as a plain file */
+export const STORED = 'stored';
 const STORAGE_KEY = 'video-quality';
 const SESSION_ID = /\/video\/stream\/([0-9a-f-]{36})\//;
 
@@ -28,9 +30,10 @@ export const realtimeEnabled = () => {
 
 export const savedQuality = () => {
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? AUTO;
+    // a stored encoded copy is preferred over live encoding unless the viewer chose otherwise
+    return localStorage.getItem(STORAGE_KEY) ?? STORED;
   } catch {
-    return AUTO;
+    return STORED;
   }
 };
 
@@ -42,7 +45,8 @@ export const saveQuality = (key: string) => {
   }
 };
 
-const qualityKey = (level: { height: number; bitrate: number }) => `${level.height}-${Math.round(level.bitrate / 1000)}`;
+const qualityKey = (level: { height: number; bitrate: number }) =>
+  `${level.height}-${Math.round(level.bitrate / 1000)}`;
 
 const codecName = (codecs?: string) => {
   const codec = codecs?.split(',')[0] ?? '';
@@ -117,7 +121,7 @@ export const attachStream = async (
     }));
 
   const setQuality = (key: string) => {
-    if (key === AUTO) {
+    if (key === AUTO || key === STORED) {
       hls.currentLevel = -1;
       return;
     }
@@ -128,7 +132,9 @@ export const attachStream = async (
     }
     // a saved choice this video does not offer: the closest size that is not larger
     const wanted = Number.parseInt(key, 10);
-    const smaller = hls.levels.map((level, index) => ({ index, height: level.height })).filter((l) => l.height <= wanted);
+    const smaller = hls.levels
+      .map((level, index) => ({ index, height: level.height }))
+      .filter((l) => l.height <= wanted);
     hls.currentLevel = smaller.length > 0 ? smaller.toSorted((a, b) => b.height - a.height)[0].index : 0;
   };
 

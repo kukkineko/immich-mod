@@ -1,7 +1,7 @@
 import { Kysely, SelectQueryBuilder, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
-import { AssetType, AssetVisibility } from 'src/enum';
+import { AssetFileType, AssetType, AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { asUuid, withExif } from 'src/utils/database';
 import { FolderAssetFilter } from 'src/utils/folder-people';
@@ -267,6 +267,20 @@ export class ViewRepository {
       group by sub order by sub
     `.execute(this.db);
     return result.rows;
+  }
+
+  /** Which of these videos already have a stored encoded copy. */
+  async getEncodedVideoIds(ids: string[]) {
+    if (ids.length === 0) {
+      return new Set<string>();
+    }
+    const rows = await this.db
+      .selectFrom('asset_file')
+      .select('assetId')
+      .where('assetId', 'in', ids)
+      .where('type', '=', AssetFileType.EncodedVideo)
+      .execute();
+    return new Set(rows.map((row) => row.assetId));
   }
 
   /** Every directory below the library root with the number of assets inside it, subfolders included. */

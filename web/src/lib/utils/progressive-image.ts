@@ -9,6 +9,8 @@ export type ProgressiveOptions = {
   low: string;
   /** sharper picture swapped in later; leave out to stay at the small one */
   high?: string;
+  /** the small picture could not be loaded; set new options to try another source */
+  onfail?: () => void;
 };
 
 type Entry = {
@@ -56,6 +58,9 @@ const start = (entry: Entry, url: string, stage: 1 | 2) => {
     entry.loader = undefined;
     // keep what is shown; a failed sharp version is not retried, a failed small one is left empty
     entry.stage = stage;
+    if (stage === 1) {
+      entry.options.onfail?.();
+    }
     pump();
   };
   loader.src = url;
@@ -131,6 +136,7 @@ export const progressive = (img: HTMLImageElement, options: ProgressiveOptions) 
   return {
     update(next: ProgressiveOptions) {
       if (next.low === entry.options.low && next.high === entry.options.high) {
+        entry.options = next;
         return;
       }
       cancel(entry);

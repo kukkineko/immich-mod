@@ -18,6 +18,8 @@ export type FolderAsset = {
   fileModifiedAt: string;
   isFavorite: boolean;
   duration: number | null;
+  /** videos: a stored encoded copy exists */
+  encodedVideo?: boolean;
   width: number | null;
   height: number | null;
   exifInfo?: {

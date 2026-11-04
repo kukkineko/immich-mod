@@ -74,7 +74,7 @@
     <div class="flex h-full w-full items-center justify-center" onclick={onbackdrop}>
       {#key current.id}
         {#if current.type === 'VIDEO'}
-          <VideoPlayer assetId={current.id} name={current.originalFileName} />
+          <VideoPlayer assetId={current.id} name={current.originalFileName} encoded={!!current.encodedVideo} />
         {:else}
           <img
             src={pictures[Math.min(sourceIndex, pictures.length - 1)]}

@@ -27,15 +27,22 @@
       video.src = playbackUrl(id);
       void video.play().catch(() => undefined);
     };
-    void attachStream(video, id, { preview: true, onFailed: fallback }).then((attached) => {
-      if (gone) {
-        attached?.destroy();
-      } else if (attached) {
-        stream = attached;
-      } else {
-        fallback();
-      }
-    });
+    // a stored encoded copy is the first choice; live encoding only for videos that have none
+    if (asset.encodedVideo) {
+      fallback();
+      return { destroy() {} };
+    }
+    void attachStream(video, id, { preview: true, onFailed: () => video.dispatchEvent(new Event('error')) }).then(
+      (attached) => {
+        if (gone) {
+          attached?.destroy();
+        } else if (attached) {
+          stream = attached;
+        } else {
+          video.dispatchEvent(new Event('error'));
+        }
+      },
+    );
     return {
       destroy() {
         gone = true;
@@ -153,11 +160,11 @@
         use:progressive={{
           low: sources[sourceIndex],
           high: `/api/assets/${asset.id}/thumbnail?size=preview`,
+          onfail: () => sourceIndex++,
         }}
         alt={asset.originalFileName}
         draggable="false"
         class="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-        onerror={() => sourceIndex++}
       />
     {/if}
     {#if previewing}
@@ -177,7 +184,10 @@
       ></video>
     {/if}
     {#if isVideo}
-      <span class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 text-xs text-white">
+      <span class="absolute right-1 bottom-1 flex items-center gap-1 rounded bg-black/60 px-1.5 text-xs text-white">
+        {#if asset.encodedVideo}
+          <span class="font-semibold text-emerald-300" title="Encoded copy stored">e</span>
+        {/if}
         &#9654; {formatDuration(asset.duration)}
       </span>
     {/if}
