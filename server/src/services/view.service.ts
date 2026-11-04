@@ -18,7 +18,8 @@ import {
   SiteTripSaveDto,
   SiteTripSummaryDto,
 } from 'src/dtos/public-site.dto';
-import { CacheControl, SystemMetadataKey } from 'src/enum';
+import { OnEvent } from 'src/decorators';
+import { CacheControl, ImmichWorker, SystemMetadataKey } from 'src/enum';
 import { ViewRepository } from 'src/repositories/view-repository';
 import { BaseService } from 'src/services/base.service';
 import { PublicSiteTrip } from 'src/types';
@@ -61,8 +62,32 @@ export class ViewService extends BaseService {
     return (await this.getAppSettings()).mode === 'travel' ? travelRoot() : contentRoot();
   }
 
+  /** Videos are streamed encoded, so the live encoder is switched on once; after that the admin decides. */
+  @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Api] })
+  async onBootstrap() {
+    try {
+      const stored = await this.systemMetadataRepository.get(SystemMetadataKey.FolderAppSettings);
+      if (stored?.encodedStreamingSet) {
+        return;
+      }
+      const config = await this.getConfig({ withCache: false });
+      if (!config.ffmpeg.realtime.enabled) {
+        config.ffmpeg.realtime.enabled = true;
+        await this.updateConfig(config);
+      }
+      await this.systemMetadataRepository.set(SystemMetadataKey.FolderAppSettings, {
+        ...stored,
+        encodedStreamingSet: true,
+      });
+    } catch (error) {
+      this.logger.warn(`Could not switch on real-time video encoding: ${error}`);
+    }
+  }
+
   async updateAppSettings(dto: FolderAppSettingsDto): Promise<FolderAppSettingsDto> {
+    const stored = await this.systemMetadataRepository.get(SystemMetadataKey.FolderAppSettings);
     await this.systemMetadataRepository.set(SystemMetadataKey.FolderAppSettings, {
+      ...stored,
       title: dto.title,
       pinMode: dto.pinMode,
       flattenSubfolders: dto.flattenSubfolders,

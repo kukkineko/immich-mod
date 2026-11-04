@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { progressive } from '$lib/utils/progressive-image';
   import { formatDay, publicFile, type PublicPhoto } from './travel-types';
 
   interface Props {
@@ -34,7 +35,8 @@
   };
 
   const arrow = 'absolute z-10 rounded-full bg-white/10 px-4 py-3 text-2xl backdrop-blur hover:bg-white/25';
-  const fit = 'absolute max-h-[calc(100%-1rem)] max-w-[calc(100%-1rem)] object-contain';
+  // fills the stage, so the small picture is already shown at full size while the sharp one is on its way
+  const fit = 'pointer-events-none absolute inset-0 h-full w-full object-contain p-2 sm:p-6';
 </script>
 
 <svelte:window {onkeydown} />
@@ -49,8 +51,13 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="relative flex min-h-0 flex-1 items-center justify-center p-2 sm:p-6" onclick={onbackdrop}>
       {#key photo.id}
-        <!-- only the downsized preview is ever sent; the camera originals are far too large for the web -->
-        <img src={publicFile(photo.id, 'preview')} alt={photo.name} class={fit} />
+        <!-- only downsized pictures are ever sent; the camera originals are far too large for the web -->
+        <!-- the grid already fetched the small one, so it shows at once and the sharp one replaces it -->
+        <img
+          use:progressive={{ low: publicFile(photo.id, 'thumbnail'), high: publicFile(photo.id, 'preview') }}
+          alt={photo.name}
+          class={fit}
+        />
       {/key}
 
       {#if index > 0}

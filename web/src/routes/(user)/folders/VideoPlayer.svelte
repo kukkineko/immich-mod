@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import { AUTO, attachStream, playbackUrl, saveQuality, savedQuality, type Quality, type VideoStream } from './video-stream';
 
   interface Props {
     assetId: string;
@@ -8,34 +9,66 @@
 
   let { assetId, name }: Props = $props();
 
-  // the transcoded copy plays almost everywhere; fall back to the untouched original
-  const sources = $derived([`/api/assets/${assetId}/video/playback`, `/api/assets/${assetId}/original`]);
-  let attempt = $state(0);
   let failed = $state(false);
   let buffering = $state(true);
   let element = $state<HTMLVideoElement>();
+  // set when the live encoded stream is not available; then the stored encoded copy plays
+  let fallback = $state(false);
+  let qualities = $state<Quality[]>([]);
+  let quality = $state(savedQuality());
+  let stream: VideoStream | undefined;
 
-  const src = $derived(sources[attempt]);
+  const stopStream = () => {
+    stream?.destroy();
+    stream = undefined;
+  };
 
-  const onerror = () => {
-    if (attempt < sources.length - 1) {
-      attempt++;
-      buffering = true;
+  const connect = async () => {
+    if (!element) {
+      return;
+    }
+    stopStream();
+    qualities = [];
+    failed = false;
+    buffering = true;
+    const video = element;
+    const attached = await attachStream(video, assetId, {
+      onQualities: (list) => (qualities = list),
+      onFailed: () => (fallback = true),
+    });
+    if (attached) {
+      stream = attached;
     } else {
-      failed = true;
-      buffering = false;
+      fallback = true;
     }
   };
 
-  const retry = () => {
-    attempt = 0;
-    failed = false;
-    buffering = true;
-    element?.load();
+  // one connection per video, and a new one when the viewer moves to another video
+  $effect(() => {
+    void assetId;
+    fallback = false;
+    void connect();
+    return stopStream;
+  });
+
+  const choose = (key: string) => {
+    quality = key;
+    saveQuality(key);
+    stream?.setQuality(key);
+  };
+
+  const onerror = () => {
+    if (fallback) {
+      failed = true;
+      buffering = false;
+    } else if (!stream) {
+      fallback = true;
+    }
   };
 
   // stop the download and playback when the viewer moves on
   onDestroy(() => {
+    stopStream();
     if (element) {
       element.pause();
       element.removeAttribute('src');
@@ -51,7 +84,15 @@
       <p class="font-semibold">This video can't be played in the browser.</p>
       <p class="text-sm text-neutral-400">{name}</p>
       <div class="flex gap-2">
-        <button type="button" class="rounded-full bg-white/20 px-4 py-2 hover:bg-white/30" onclick={retry}>
+        <button
+          type="button"
+          class="rounded-full bg-white/20 px-4 py-2 hover:bg-white/30"
+          onclick={() => {
+            fallback = false;
+            failed = false;
+            void connect();
+          }}
+        >
           Try again
         </button>
         <a
@@ -64,27 +105,40 @@
       </div>
     </div>
   {:else}
-    {#key src}
-      <!-- svelte-ignore a11y_media_has_caption -->
-      <video
-        bind:this={element}
-        {src}
-        poster="/api/assets/{assetId}/thumbnail?size=preview"
-        controls
-        autoplay
-        playsinline
-        preload="metadata"
-        class="pointer-events-auto max-h-full max-w-full"
-        {onerror}
-        onloadeddata={() => (buffering = false)}
-        onwaiting={() => (buffering = true)}
-        onplaying={() => (buffering = false)}
-      ></video>
-    {/key}
+    <!-- svelte-ignore a11y_media_has_caption -->
+    <video
+      bind:this={element}
+      src={fallback ? playbackUrl(assetId) : undefined}
+      poster="/api/assets/{assetId}/thumbnail?size=preview"
+      controls
+      autoplay
+      playsinline
+      preload="metadata"
+      class="pointer-events-auto max-h-full max-w-full"
+      {onerror}
+      onloadeddata={() => (buffering = false)}
+      onwaiting={() => (buffering = true)}
+      onplaying={() => (buffering = false)}
+    ></video>
     {#if buffering}
       <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div class="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
       </div>
+    {/if}
+    {#if qualities.length > 1}
+      <label class="pointer-events-auto absolute top-3 left-3 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur">
+        Quality
+        <select
+          class="bg-transparent text-white outline-none"
+          value={quality}
+          onchange={(event) => choose(event.currentTarget.value)}
+        >
+          <option value={AUTO} class="text-black">Auto</option>
+          {#each qualities as option (option.key)}
+            <option value={option.key} class="text-black">{option.label}</option>
+          {/each}
+        </select>
+      </label>
     {/if}
   {/if}
 </div>

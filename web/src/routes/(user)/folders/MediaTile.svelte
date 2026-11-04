@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { progressive } from '$lib/utils/progressive-image';
   import { aspectRatio, formatDuration, pictureSources, type FolderAsset } from './folder-types';
+  import { attachStream, playbackUrl, type VideoStream } from './video-stream';
 
   interface Props {
     asset: FolderAsset;
@@ -12,13 +14,35 @@
   let previewing = $state(false);
   let previewFailed = $state(false);
   let sourceIndex = $state(0);
-  let videoIndex = $state(0);
-  // the transcoded copy first; the original when that one is missing or cannot be played
-  const videoSources = $derived([`/api/assets/${asset.id}/video/playback`, `/api/assets/${asset.id}/original`]);
   const sources = $derived(pictureSources(asset.id, asset.type === 'IMAGE'));
   const imageFailed = $derived(sourceIndex >= sources.length);
   let holdTimer: ReturnType<typeof setTimeout> | undefined;
   let touchPreviewed = false;
+
+  // the preview plays the smallest encoded stream; if streaming is off, the stored encoded copy. Never the original.
+  const previewStream = (video: HTMLVideoElement, id: string) => {
+    let stream: VideoStream | undefined;
+    let gone = false;
+    const fallback = () => {
+      video.src = playbackUrl(id);
+      void video.play().catch(() => undefined);
+    };
+    void attachStream(video, id, { preview: true, onFailed: fallback }).then((attached) => {
+      if (gone) {
+        attached?.destroy();
+      } else if (attached) {
+        stream = attached;
+      } else {
+        fallback();
+      }
+    });
+    return {
+      destroy() {
+        gone = true;
+        stream?.destroy();
+      },
+    };
+  };
 
   const isVideo = $derived(asset.type === 'VIDEO');
   const ratio = $derived(aspectRatio(asset));
@@ -126,9 +150,11 @@
     {:else}
       <!-- videos keep their whole frame (portrait clips would be cropped to a square otherwise) -->
       <img
-        src={sources[sourceIndex]}
+        use:progressive={{
+          low: sources[sourceIndex],
+          high: `/api/assets/${asset.id}/thumbnail?size=preview`,
+        }}
         alt={asset.originalFileName}
-        loading="lazy"
         draggable="false"
         class="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
         onerror={() => sourceIndex++}
@@ -136,7 +162,7 @@
     {/if}
     {#if previewing}
       <video
-        src={videoSources[videoIndex]}
+        use:previewStream={asset.id}
         muted
         loop
         autoplay
@@ -144,13 +170,7 @@
         preload="auto"
         poster={`/api/assets/${asset.id}/thumbnail?size=preview`}
         class="pointer-events-none absolute inset-0 h-full w-full bg-black object-cover"
-        onloadedmetadata={(event) => void event.currentTarget.play().catch(() => undefined)}
-        oncanplay={(event) => void event.currentTarget.play().catch(() => undefined)}
         onerror={() => {
-          if (videoIndex + 1 < videoSources.length) {
-            videoIndex++;
-            return;
-          }
           previewFailed = true;
           previewing = false;
         }}

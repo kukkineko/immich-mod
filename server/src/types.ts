@@ -553,6 +553,8 @@ export interface SystemMetadata extends Record<SystemMetadataKey, Record<string,
     pinMode?: 'every-load' | 'session' | 'off';
     flattenSubfolders?: boolean;
     mode?: 'content' | 'travel';
+    /** real-time video encoding was switched on once at startup; an admin may turn it off again afterwards */
+    encodedStreamingSet?: boolean;
   };
   [SystemMetadataKey.FolderCovers]: Record<string, string>;
   [SystemMetadataKey.FolderModes]: Record<string, boolean>;
