@@ -305,8 +305,16 @@
         <details class="relative">
           <summary class="{buttonClass} cursor-pointer list-none">Arrange ▾</summary>
           <div
-            class="absolute right-0 z-10 mt-1 flex w-56 flex-col rounded-xl border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
+            class="absolute right-0 z-10 mt-1 flex w-56 max-w-[calc(100vw-1.5rem)] flex-col rounded-xl border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
           >
+            <button
+              type="button"
+              class="mb-1 self-end rounded-full px-3 py-1 text-lg leading-none hover:bg-neutral-100 sm:hidden dark:hover:bg-neutral-700"
+              aria-label="Close menu"
+              onclick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}
+            >
+              &#10005;
+            </button>
             {#each [['date-asc', 'Oldest first'], ['date-desc', 'Newest first'], ['place', 'Sort by place'], ['group-day', 'Group by day'], ['group-place', 'Group by place']] as [mode, label] (mode)}
               <button
                 type="button"

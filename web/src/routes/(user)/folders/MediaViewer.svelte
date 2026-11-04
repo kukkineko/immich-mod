@@ -1,6 +1,7 @@
 <script lang="ts">
   import AssetInfo from './AssetInfo.svelte';
   import VideoPlayer from './VideoPlayer.svelte';
+  import VideoQuality from './VideoQuality.svelte';
   import { ladder, progressive } from '$lib/utils/progressive-image';
   import { assetPicture, type FolderAsset } from './folder-types';
 
@@ -57,7 +58,8 @@
     setTimeout(() => (coverState = 'idle'), 2500);
   };
 
-  const buttonClass = 'rounded-full bg-white/20 px-4 py-2 text-white hover:bg-white/30';
+  const buttonClass =
+    'rounded-full bg-white/20 px-3 py-1.5 text-sm text-white hover:bg-white/30 sm:px-4 sm:py-2 sm:text-base';
 </script>
 
 <svelte:window {onkeydown} />
@@ -79,42 +81,46 @@
       {/key}
     </div>
 
-    <div class="absolute top-4 left-4 flex flex-wrap gap-2">
-      <button
-        type="button"
-        class="{buttonClass} {current.isFavorite ? 'text-amber-300' : ''}"
-        aria-pressed={current.isFavorite}
-        onclick={() => onfavorite(current)}
-      >
-        {current.isFavorite ? '★ Favourite' : '☆ Favourite'}
-      </button>
-      <button type="button" class={buttonClass} onclick={() => (showInfo = !showInfo)} aria-pressed={showInfo}>
-        Info
-      </button>
-      <a class={buttonClass} href="/api/assets/{current.id}/original" download={current.originalFileName}>Download</a>
-      {#if oncover}
-        <button type="button" class={buttonClass} disabled={coverState === 'saving'} onclick={makeCover}>
-          {coverState === 'done'
-            ? 'Folder image set'
-            : coverState === 'failed'
-              ? 'Could not set image'
-              : 'Set as folder image'}
-        </button>
-      {/if}
-    </div>
-
-    <button
-      type="button"
-      class="absolute top-4 z-20 {buttonClass} {showInfo ? 'right-84' : 'right-4'}"
-      onclick={onclose}
+    <!-- one bar at the top: actions on the left, quality and the close X on the right, never overlapping -->
+    <div
+      class="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 bg-gradient-to-b from-black/70 to-transparent p-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:p-4 {showInfo
+        ? 'sm:right-80'
+        : ''}"
     >
-      Close
-    </button>
+      <div class="pointer-events-auto flex min-w-0 flex-wrap gap-2">
+        <button
+          type="button"
+          class="{buttonClass} {current.isFavorite ? 'text-amber-300' : ''}"
+          aria-pressed={current.isFavorite}
+          aria-label="Favourite"
+          onclick={() => onfavorite(current)}
+        >
+          {current.isFavorite ? '★' : '☆'}<span class="hidden sm:inline"> Favourite</span>
+        </button>
+        <button type="button" class={buttonClass} onclick={() => (showInfo = !showInfo)} aria-pressed={showInfo}>
+          Info
+        </button>
+        <a class={buttonClass} href="/api/assets/{current.id}/original" download={current.originalFileName}>
+          Download
+        </a>
+        {#if oncover}
+          <button type="button" class={buttonClass} disabled={coverState === 'saving'} onclick={makeCover}>
+            {coverState === 'done' ? 'Folder image set' : coverState === 'failed' ? 'Could not set image' : 'Set as folder image'}
+          </button>
+        {/if}
+      </div>
+      <div class="pointer-events-auto flex shrink-0 items-start gap-2">
+        {#if current.type === 'VIDEO'}
+          <VideoQuality />
+        {/if}
+        <button type="button" class="{buttonClass} px-3.5" aria-label="Close" onclick={onclose}>&#10005;</button>
+      </div>
+    </div>
 
     {#if index > 0}
       <button
         type="button"
-        class="absolute top-1/2 left-4 -translate-y-1/2 rounded-full bg-white/20 px-4 py-3 text-2xl text-white hover:bg-white/30"
+        class="absolute top-1/2 left-2 -translate-y-1/2 sm:left-4 rounded-full bg-white/20 px-4 py-3 text-2xl text-white hover:bg-white/30"
         aria-label="Previous"
         onclick={() => step(-1)}
       >
@@ -124,9 +130,9 @@
     {#if index < assets.length - 1}
       <button
         type="button"
-        class="absolute top-1/2 {showInfo
-          ? 'right-84'
-          : 'right-4'} -translate-y-1/2 rounded-full bg-white/20 px-4 py-3 text-2xl text-white hover:bg-white/30"
+        class="absolute top-1/2 right-2 sm:right-4 {showInfo
+          ? 'sm:right-84'
+          : ''} -translate-y-1/2 rounded-full bg-white/20 px-4 py-3 text-2xl text-white hover:bg-white/30"
         aria-label="Next"
         onclick={() => step(1)}
       >
@@ -135,7 +141,7 @@
     {/if}
 
     {#if showInfo}
-      <AssetInfo asset={current} />
+      <AssetInfo asset={current} onclose={() => (showInfo = false)} />
     {/if}
   </div>
 {/if}

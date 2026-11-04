@@ -128,6 +128,7 @@
   <div class="flex max-h-full w-full max-w-5xl flex-col rounded-2xl bg-neutral-50 shadow-xl dark:bg-neutral-900">
     <div class="flex flex-wrap items-center gap-3 border-b border-neutral-200 p-4 dark:border-neutral-700">
       <h2 class="text-lg font-semibold">Add photos</h2>
+      <button type="button" class="rounded-full border border-neutral-300 px-3 py-1 text-lg leading-none hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-700" aria-label="Close" onclick={onclose}>&#10005;</button>
       <select
         class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800"
         value={folder}

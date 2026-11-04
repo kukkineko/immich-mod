@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import {
-    AUTO,
     STORED,
     attachStream,
     playbackUrl,
@@ -10,6 +9,7 @@
     type Quality,
     type VideoStream,
   } from './video-stream';
+  import { videoUi } from './video-ui.svelte';
 
   interface Props {
     assetId: string;
@@ -82,6 +82,19 @@
     }
   };
 
+  // the viewer's toolbar shows the quality menu; this keeps it in step with what is playing
+  $effect(() => {
+    videoUi.encoded = encoded;
+    videoUi.qualities = qualities;
+    videoUi.quality = quality;
+    videoUi.choose = choose;
+    videoUi.active = true;
+    return () => {
+      videoUi.active = false;
+      videoUi.choose = undefined;
+    };
+  });
+
   const onerror = () => {
     if (fallback) {
       failed = true;
@@ -151,26 +164,6 @@
       <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div class="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
       </div>
-    {/if}
-    {#if encoded || qualities.length > 1}
-      <label
-        class="pointer-events-auto absolute top-3 left-3 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur"
-      >
-        Quality
-        <select
-          class="bg-transparent text-white outline-none"
-          value={encoded && quality === STORED ? STORED : quality === STORED ? AUTO : quality}
-          onchange={(event) => choose(event.currentTarget.value)}
-        >
-          {#if encoded}
-            <option value={STORED} class="text-black">Stored copy</option>
-          {/if}
-          <option value={AUTO} class="text-black">Live · Auto</option>
-          {#each qualities as option (option.key)}
-            <option value={option.key} class="text-black">Live · {option.label}</option>
-          {/each}
-        </select>
-      </label>
     {/if}
   {/if}
 </div>

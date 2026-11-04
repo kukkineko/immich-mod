@@ -74,6 +74,10 @@
   </div>
 
   {#if filtersOpen}
+    <div class="mt-3 flex items-center justify-between sm:hidden">
+      <span class="text-sm font-semibold">Filters</span>
+      <button type="button" class="rounded-full border border-neutral-300 px-3 py-1 text-lg leading-none hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-700" aria-label="Close filters" onclick={() => (filtersOpen = false)}>&#10005;</button>
+    </div>
     <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <fieldset class="space-y-1">
         <legend class="text-xs text-neutral-500 uppercase">Date taken</legend>

@@ -65,7 +65,8 @@
       <button
         type="button"
         class="absolute top-3 right-3 z-10 rounded-full bg-white/10 px-4 py-2 text-sm backdrop-blur hover:bg-white/25"
-        onclick={onclose}>Close</button
+        onclick={onclose}
+        aria-label="Close">&#10005;</button
       >
     </div>
 

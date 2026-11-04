@@ -3,9 +3,10 @@
 
   interface Props {
     asset: FolderAsset;
+    onclose: () => void;
   }
 
-  let { asset }: Props = $props();
+  let { asset, onclose }: Props = $props();
 
   type Face = {
     id: string;
@@ -98,11 +99,22 @@
   );
 </script>
 
+<!-- a sheet over the lower part of the screen on a phone (the picture stays visible), a side panel from sm up -->
 <aside
-  class="absolute top-0 right-0 bottom-0 z-10 w-80 max-w-full overflow-y-auto bg-neutral-900/95 p-4 text-white shadow-2xl"
+  class="absolute inset-x-0 bottom-0 z-30 max-h-[55vh] overflow-y-auto rounded-t-2xl bg-neutral-900/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white shadow-2xl sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-80 sm:rounded-none"
   aria-label="Info"
 >
-  <h2 class="mt-12 mb-4 text-lg font-semibold">Info</h2>
+  <div class="sticky -top-4 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-neutral-900 px-4 py-3">
+    <h2 class="text-lg font-semibold">Info</h2>
+    <button
+      type="button"
+      class="rounded-full bg-white/15 px-3 py-1 text-lg leading-none hover:bg-white/25"
+      aria-label="Close info"
+      onclick={onclose}
+    >
+      &#10005;
+    </button>
+  </div>
   <dl class="space-y-3 text-sm">
     {#each rows as [label, value] (label)}
       <div>

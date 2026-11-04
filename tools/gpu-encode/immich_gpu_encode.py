@@ -175,6 +175,23 @@ def works(ffmpeg, kind, codec):
         return False
 
 
+def probe_sessions(ffmpeg, kind, codec, wanted):
+    """How many encodes can really run together. A GPU driver caps the sessions, so start `wanted` at once and count."""
+    name = ENCODERS[kind][codec]
+    command = [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-re", "-f", "lavfi", "-i", "color=black:s=1280x720:r=30:d=3",
+        "-pix_fmt", "yuv420p", "-c:v", name, "-f", "null", "-",
+    ]
+    processes = [subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) for _ in range(wanted)]
+    ok = 0
+    for process in processes:
+        try:
+            ok += process.wait(timeout=60) == 0
+        except subprocess.TimeoutExpired:
+            process.kill()
+    return ok
+
+
 def pick_encoder(ffmpeg, wanted, codec):
     order = ["nvenc", "qsv", "amf", "cpu"] if wanted == "auto" else [wanted]
     for kind in order:
@@ -313,7 +330,15 @@ def run_pipeline(args, server, queue_items, kind, work):
             stats.move("enc", 1)
             try:
                 try:
-                    encode(args.ffmpeg, source, target, kind, args.codec, args.height, args.bitrate, True)
+                    for attempt in range(4):
+                        try:
+                            encode(args.ffmpeg, source, target, kind, args.codec, args.height, args.bitrate, True)
+                            break
+                        except RuntimeError as error:
+                            # another encode holds the last GPU session for a moment: wait and try again
+                            if attempt == 3 or "OpenEncodeSession" not in str(error):
+                                raise
+                            time.sleep(3 + attempt * 3)
                 except RuntimeError:
                     # some sources do not like hardware decoding; decode in software then
                     encode(args.ffmpeg, source, target, kind, args.codec, args.height, args.bitrate, False)
@@ -380,10 +405,10 @@ def main():
     parser.add_argument("--bitrate", default="8M", help="maximum bitrate, e.g. 4M or 8000k (default 8M)")
     parser.add_argument("--codec", choices=["h264", "hevc", "av1"], default="h264", help="h264 plays everywhere")
     parser.add_argument("--encoder", choices=["auto", "nvenc", "qsv", "amf", "cpu"], default="auto")
-    parser.add_argument("--downloads", type=int, default=4, help="parallel downloads (default 4)")
-    parser.add_argument("--encoders", type=int, default=0, help="parallel encodes (default: 3 on a GPU, 1 on the CPU)")
-    parser.add_argument("--uploads", type=int, default=3, help="parallel uploads (default 3)")
-    parser.add_argument("--inflight", type=int, default=0, help="videos on disk at once (default: encoders + 4)")
+    parser.add_argument("--downloads", type=int, default=10, help="parallel downloads (default 10)")
+    parser.add_argument("--encoders", type=int, default=0, help="parallel encodes (default: 20 on a GPU, cut to what the GPU allows; 1 on the CPU)")
+    parser.add_argument("--uploads", type=int, default=10, help="parallel uploads (default 10)")
+    parser.add_argument("--inflight", type=int, default=0, help="videos on disk at once (default 50)")
     parser.add_argument("--workdir", default=None, help="folder for temporary files, fastest disk you have")
     parser.add_argument("--ffmpeg", default=shutil.which("ffmpeg") or "ffmpeg")
     parser.add_argument("--insecure", action="store_true", help="accept a self-signed https certificate")
@@ -412,9 +437,14 @@ def main():
 
     kind = pick_encoder(args.ffmpeg, args.encoder, args.codec)
     if not args.encoders:
-        args.encoders = 1 if kind == "cpu" else 3
+        args.encoders = 1 if kind == "cpu" else 20
+    if kind != "cpu" and args.encoders > 1:
+        possible = probe_sessions(args.ffmpeg, kind, args.codec, args.encoders)
+        if possible < args.encoders:
+            print(f"The GPU allows {possible} encodes at once, not {args.encoders}; using {possible}.")
+            args.encoders = max(1, possible)
     if not args.inflight:
-        args.inflight = args.encoders + 4
+        args.inflight = max(50, args.encoders + 10)
     print(
         f"Encoder: {ENCODERS[kind][args.codec]}  |  up to {args.height}p, {args.bitrate} max, {args.codec}\n"
         f"Parallel: {args.downloads} downloads, {args.encoders} encodes, {args.uploads} uploads, "
